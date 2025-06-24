@@ -34,8 +34,15 @@ export interface Job {
   status: JobStatus;
   cloudLink?: string;
   createdAt: string;
-  paidAt?: string; // ISO string date - Used for "data_de_pagamento"
-  notes?: string;
+  paidAt?: string; // ISO string date - Specifically for when payment was made
+  notes?: string; // General job notes
+
+  // New fields for detailed payment registration
+  paymentDate?: string; // The actual date payment was registered/received
+  paymentMethod?: string;
+  paymentAttachmentName?: string; // Filename of the attachment
+  paymentAttachmentData?: string; // Optional: base64 data if storing file content
+  paymentNotes?: string; // Notes specific to the payment
 }
 
 export enum FinancialStatus {
@@ -72,8 +79,9 @@ export interface AppSettings {
   customLogo?: string; // base64 string
   asaasUrl?: string;
   googleDriveUrl?: string;
-  userName?: string; // New: For personalized greeting
-  primaryColor?: string; // New: For main app background
-  accentColor?: string; // New: For accent elements
-  splashScreenBackgroundColor?: string; // New: For branding splash screen background
+  userName?: string; 
+  primaryColor?: string; 
+  accentColor?: string; 
+  splashScreenBackgroundColor?: string;
+  privacyModeEnabled?: boolean; // New: For obfuscating monetary values
 }

@@ -159,7 +159,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       </div>
 
       <div className="flex justify-end pt-2">
-        <button type="submit" className="bg-accent text-white px-6 py-2 rounded-lg shadow hover:bg-opacity-90 transition-colors">
+        <button type="submit" className="bg-accent text-white px-6 py-2 rounded-lg shadow hover:brightness-90 transition-all">
           {jobToEdit ? 'Salvar Alterações' : 'Adicionar Job'}
         </button>
       </div>

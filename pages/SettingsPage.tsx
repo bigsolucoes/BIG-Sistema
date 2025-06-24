@@ -135,7 +135,7 @@ const SettingsPage: React.FC = () => {
                     id="logoUpload" 
                     accept="image/png, image/jpeg, image/svg+xml"
                     onChange={handleLogoUpload}
-                    className={`${commonInputClass} file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:bg-opacity-90`}
+                    className={`${commonInputClass} file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:brightness-90`}
                 />
             </div>
             {customLogoPreview && (
@@ -203,7 +203,7 @@ const SettingsPage: React.FC = () => {
       <div className="flex justify-end mt-8">
         <button
           onClick={handleSaveChanges}
-          className="bg-accent text-white px-6 py-3 rounded-lg shadow hover:bg-opacity-90 transition-colors text-lg font-semibold"
+          className="bg-accent text-white px-6 py-3 rounded-lg shadow hover:brightness-90 transition-all text-lg font-semibold"
         >
           Salvar Alterações
         </button>

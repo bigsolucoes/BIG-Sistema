@@ -1,6 +1,6 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Job, Client } from '../types';
+import { formatCurrency } from '../utils/formatters'; // Import the new formatter
 
 // Ensure API_KEY is set in your environment variables
 const API_KEY = process.env.API_KEY;
@@ -17,13 +17,16 @@ interface AppContextData {
   clients: Client[];
 }
 
+// AI should always see real values, regardless of UI privacy mode
 const formatDataForPrompt = (data: AppContextData): string => {
   let contextString = "Dados do Sistema:\n";
   contextString += "--- Jobs ---\n";
   if (data.jobs.length > 0) {
     data.jobs.forEach(job => {
       const clientName = data.clients.find(c => c.id === job.clientId)?.name || 'Desconhecido';
-      contextString += `Nome: ${job.name}, Cliente: ${clientName}, Valor: R$${job.value}, Prazo: ${new Date(job.deadline).toLocaleDateString('pt-BR')}, Status: ${job.status}, Tipo: ${job.serviceType}\n`;
+      // Use formatCurrency with privacyMode explicitly false
+      const jobValueFormatted = formatCurrency(job.value, false); 
+      contextString += `Nome: ${job.name}, Cliente: ${clientName}, Valor: ${jobValueFormatted}, Prazo: ${new Date(job.deadline).toLocaleDateString('pt-BR')}, Status: ${job.status}, Tipo: ${job.serviceType}\n`;
     });
   } else {
     contextString += "Nenhum job cadastrado.\n";
@@ -34,7 +37,9 @@ const formatDataForPrompt = (data: AppContextData): string => {
     data.clients.forEach(client => {
       const clientJobs = data.jobs.filter(j => j.clientId === client.id);
       const totalBilled = clientJobs.reduce((sum, j) => sum + j.value, 0);
-      contextString += `Nome: ${client.name}, Empresa: ${client.company || 'N/A'}, Email: ${client.email}, Total Faturado: R$${totalBilled}\n`;
+      // Use formatCurrency with privacyMode explicitly false
+      const totalBilledFormatted = formatCurrency(totalBilled, false);
+      contextString += `Nome: ${client.name}, Empresa: ${client.company || 'N/A'}, Email: ${client.email}, Total Faturado: ${totalBilledFormatted}\n`;
     });
   } else {
     contextString += "Nenhum cliente cadastrado.\n";
@@ -48,14 +53,12 @@ export const callGeminiApi = async (
   appContextData: AppContextData
 ): Promise<GenerateContentResponse> => {
   if (!ai) {
-    // Return a mock error response if AI is not initialized
     return Promise.resolve({
         text: "Desculpe, o assistente de IA não está configurado corretamente (API Key ausente).",
-        // Mock other parts of GenerateContentResponse if needed for type consistency
         candidates: [],
         promptFeedback: undefined,
         usageMetadata: undefined,
-      } as unknown as GenerateContentResponse); // Cast to assure type, but it's a simplified mock
+      } as unknown as GenerateContentResponse); 
   }
 
   const dataContext = formatDataForPrompt(appContextData);
@@ -77,23 +80,18 @@ export const callGeminiApi = async (
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
-        // Uncomment to enable Google Search if needed for broader queries
-        // tools: [{googleSearch: {}}], 
+        // tools: [{googleSearch: {}}], // Enable if needed
       }
     });
     
-    // The 'text' property is directly available on the response object
-    // No need for response.response.text() or similar.
     return response;
 
   } catch (error) {
     console.error('Error calling Gemini API:', error);
-    // Construct a more detailed error message if possible
     let errorMessage = "Ocorreu um erro ao contatar o assistente de IA.";
     if (error instanceof Error) {
         errorMessage += ` Detalhes: ${error.message}`;
     }
-    // Return a mock error response
      return Promise.resolve({
         text: errorMessage,
         candidates: [],

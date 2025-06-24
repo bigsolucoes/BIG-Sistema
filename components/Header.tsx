@@ -1,14 +1,18 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../hooks/useAppData';
-import { APP_NAME, CogIcon } from '../constants'; // Import CogIcon
+import { APP_NAME, CogIcon, EyeOpenIcon, EyeClosedIcon } from '../constants';
 
 const Header: React.FC = () => {
-  const { settings } = useAppData();
+  const { settings, updateSettings } = useAppData();
   const navigate = useNavigate();
 
   const handleLogoClick = () => {
     navigate('/dashboard');
+  };
+
+  const togglePrivacyMode = () => {
+    updateSettings({ privacyModeEnabled: !settings.privacyModeEnabled });
   };
 
   return (
@@ -26,14 +30,23 @@ const Header: React.FC = () => {
         )}
       </div>
 
-      {/* Settings Icon on the right */}
-      <Link 
-        to="/settings" 
-        className="p-2 text-text-secondary hover:text-accent transition-colors"
-        title="Configurações"
-      >
-        <CogIcon />
-      </Link>
+      {/* Icons on the right */}
+      <div className="flex items-center space-x-3">
+        <button
+          onClick={togglePrivacyMode}
+          className="p-2 text-text-secondary hover:text-accent transition-colors"
+          title={settings.privacyModeEnabled ? "Mostrar Valores Monetários" : "Ocultar Valores Monetários"}
+        >
+          {settings.privacyModeEnabled ? <EyeClosedIcon /> : <EyeOpenIcon />}
+        </button>
+        <Link 
+          to="/settings" 
+          className="p-2 text-text-secondary hover:text-accent transition-colors"
+          title="Configurações"
+        >
+          <CogIcon />
+        </Link>
+      </div>
     </header>
   );
 };

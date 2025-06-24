@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Client, Job } from '../types';
@@ -7,15 +6,17 @@ import Modal from '../components/Modal';
 import ClientForm from './forms/ClientForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { formatCurrency, formatDate } from '../utils/formatters'; // Import formatters
 
 interface ClientCardProps {
   client: Client;
   jobs: Job[];
   onEdit: (client: Client) => void;
   onDelete: (clientId: string) => void;
+  privacyModeEnabled: boolean;
 }
 
-const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete }) => {
+const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete, privacyModeEnabled }) => {
   const clientJobs = jobs.filter(job => job.clientId === client.id);
   const totalBilled = clientJobs.reduce((sum, job) => sum + job.value, 0);
 
@@ -36,7 +37,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete 
           <p className="text-sm text-text-secondary"><strong>Email:</strong> {client.email}</p>
           {client.phone && <p className="text-sm text-text-secondary"><strong>Telefone:</strong> {client.phone}</p>}
           {client.cpf && <p className="text-sm text-text-secondary"><strong>CPF:</strong> {client.cpf}</p>}
-          <p className="text-sm text-text-secondary"><strong>Cliente desde:</strong> {new Date(client.createdAt).toLocaleDateString('pt-BR')}</p>
+          <p className="text-sm text-text-secondary"><strong>Cliente desde:</strong> {formatDate(client.createdAt)}</p>
           {client.observations && (
             <div className="mt-2 pt-2 border-t border-border-color">
                 <p className="text-sm font-medium text-text-secondary">Observações:</p>
@@ -48,7 +49,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete 
       <div className="mt-4 pt-4 border-t border-border-color">
         <div className="flex items-center text-text-primary">
           <CurrencyDollarIcon />
-          <span className="ml-2">Total Faturado: R$ {totalBilled.toLocaleString('pt-BR')}</span>
+          <span className="ml-2">Total Faturado: {formatCurrency(totalBilled, privacyModeEnabled)}</span>
         </div>
         <p className="text-sm text-text-secondary mt-1">{clientJobs.length} job(s) realizados.</p>
       </div>
@@ -58,7 +59,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete 
 
 
 const ClientsPage: React.FC = () => {
-  const { clients, jobs, deleteClient, loading } = useAppData();
+  const { clients, jobs, deleteClient, settings, loading } = useAppData();
   const [isModalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>(undefined);
 
@@ -73,7 +74,6 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDeleteClient = (clientId: string) => {
-    // Check if client has associated jobs
     const associatedJobsCount = jobs.filter(job => job.clientId === clientId).length;
     let confirmMessage = 'Tem certeza que deseja excluir este cliente?';
     if (associatedJobsCount > 0) {
@@ -101,7 +101,7 @@ const ClientsPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-text-primary">Clientes</h1>
         <button
           onClick={handleAddClient}
-          className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:bg-opacity-90 transition-colors flex items-center"
+          className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-all flex items-center"
         >
           <PlusCircleIcon /> <span className="ml-2">Adicionar Novo Cliente</span>
         </button>
@@ -116,6 +116,7 @@ const ClientsPage: React.FC = () => {
               jobs={jobs} 
               onEdit={handleEditClient}
               onDelete={handleDeleteClient}
+              privacyModeEnabled={settings.privacyModeEnabled || false}
             />
           ))}
         </div>

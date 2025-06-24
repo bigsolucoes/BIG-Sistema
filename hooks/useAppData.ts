@@ -12,7 +12,7 @@ interface AppDataContextType {
   jobs: Job[];
   clients: Client[];
   settings: AppSettings;
-  addJob: (job: Omit<Job, 'id' | 'createdAt'>) => void;
+  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'paymentDate' | 'paymentMethod' | 'paymentAttachmentName' | 'paymentNotes' >) => void;
   updateJob: (job: Job) => void;
   deleteJob: (jobId: string) => void;
   getJobById: (jobId: string) => Job | undefined;
@@ -31,7 +31,7 @@ const initialJobs: Job[] = [
     { id: uuidv4(), name: 'Sessão Fotográfica "Urban Style"', clientId: 'client2', serviceType: ServiceType.PHOTO, value: 800, deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.BRIEFING, createdAt: new Date().toISOString() },
     { id: uuidv4(), name: 'Redesign Logotipo "NatureFoods"', clientId: 'client3', serviceType: ServiceType.DESIGN, value: 1200, deadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.REVIEW, createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Client wants a modern, minimalist look.' },
     { id: uuidv4(), name: 'Cobertura Evento "MusicFest"', clientId: 'client1', serviceType: ServiceType.PHOTO, value: 1500, deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.BRIEFING, createdAt: new Date().toISOString() },
-    { id: uuidv4(), name: 'Animação Curta "StarDust"', clientId: 'client2', serviceType: ServiceType.VIDEO, value: 3200, deadline: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.FINALIZED, paidAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString() },
+    { id: uuidv4(), name: 'Animação Curta "StarDust"', clientId: 'client2', serviceType: ServiceType.VIDEO, value: 3200, deadline: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.FINALIZED, paidAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), paymentDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), paymentMethod: 'PIX', createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString() },
 ];
 
 const initialClients: Client[] = [
@@ -48,6 +48,7 @@ const initialSettings: AppSettings = {
   primaryColor: DEFAULT_PRIMARY_COLOR,
   accentColor: DEFAULT_ACCENT_COLOR,
   splashScreenBackgroundColor: DEFAULT_SPLASH_BACKGROUND_COLOR,
+  privacyModeEnabled: false, // Default privacy mode to false
 };
 
 
@@ -60,12 +61,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Apply theme colors from settings to CSS variables
   useEffect(() => {
     document.documentElement.style.setProperty('--color-main-bg', settings.primaryColor || DEFAULT_PRIMARY_COLOR);
-    document.documentElement.style.setProperty('--color-accent', settings.accentColor || DEFAULT_ACCENT_COLOR);
-    // Note: --color-input-focus-border might also need to be derived or made configurable
-    // For now, it uses a darker shade of accent, which might not always work if accent is very light.
-    // A simple approach for input focus border if accent is light: use a fixed dark gray or a darker version of primary.
-    // Or, in index.html, make --color-input-focus-border also configurable or derived.
-    // For simplicity, we'll keep the current derivation logic in index.html for focus border.
+    const currentAccentColor = settings.accentColor || DEFAULT_ACCENT_COLOR;
+    document.documentElement.style.setProperty('--color-accent', currentAccentColor);
+    // Also set input focus border to the accent color for consistency
+    document.documentElement.style.setProperty('--color-input-focus-border', currentAccentColor); 
   }, [settings.primaryColor, settings.accentColor]);
 
   useEffect(() => {
@@ -78,10 +77,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setClients(storedClients ? JSON.parse(storedClients) : initialClients);
       
       const loadedSettings = storedSettings ? JSON.parse(storedSettings) : initialSettings;
-      // Ensure all settings fields have defaults if not present in loadedSettings
       setSettings({
-        ...initialSettings, // Start with defaults
-        ...loadedSettings    // Override with loaded values
+        ...initialSettings, 
+        ...loadedSettings    
       });
 
     } catch (error) {
@@ -113,8 +111,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [settings, loading]);
 
 
-  const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt'>) => {
-    const newJob: Job = { ...jobData, id: uuidv4(), createdAt: new Date().toISOString() };
+  const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'paidAt' | 'paymentDate' | 'paymentMethod' | 'paymentAttachmentName' | 'paymentNotes'>) => {
+    const newJob: Job = { 
+        ...jobData, 
+        id: uuidv4(), 
+        createdAt: new Date().toISOString() 
+    };
     setJobs(prev => [...prev, newJob]);
   }, []);
 

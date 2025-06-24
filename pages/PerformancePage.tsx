@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, Client, ServiceType, JobStatus } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { formatCurrency } from '../utils/formatters';
 
 const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <div className="bg-card-bg p-6 rounded-xl shadow-lg">
@@ -14,67 +14,71 @@ const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ tit
   </div>
 );
 
-const KPICard: React.FC<{ title: string; value: string | number; unit?: string }> = ({ title, value, unit }) => (
+const KPICard: React.FC<{ title: string; value: string | number; unit?: string; isCurrency?: boolean; privacyModeEnabled?: boolean }> = 
+  ({ title, value, unit, isCurrency = false, privacyModeEnabled = false }) => (
   <div className="bg-card-bg p-6 rounded-xl shadow-lg text-center">
     <h3 className="text-md font-medium text-text-secondary mb-1">{title}</h3>
     <p className="text-3xl font-bold text-accent">
-      {typeof value === 'number' ? value.toLocaleString('pt-BR', {minimumFractionDigits: unit === 'dias' ? 0 : (unit === 'R$' ? 2 : 0) , maximumFractionDigits: unit === 'dias' ? 0 : (unit === 'R$' ? 2 : 0)}) : value}
-      {unit && <span className="text-lg ml-1">{unit}</span>}
+      {isCurrency 
+        ? formatCurrency(typeof value === 'number' ? value : parseFloat(value.toString()), privacyModeEnabled, unit || 'R$') 
+        : (typeof value === 'number' ? value.toLocaleString('pt-BR', {minimumFractionDigits: unit === 'dias' ? 0 : 0 , maximumFractionDigits: unit === 'dias' ? 0 : 1}) : value)
+      }
+      {!isCurrency && unit && <span className="text-lg ml-1">{unit}</span>}
     </p>
   </div>
 );
 
 
 const PerformancePage: React.FC = () => {
-  const { jobs, clients, loading } = useAppData();
+  const { jobs, clients, settings, loading } = useAppData();
 
   if (loading) {
     return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
   }
+  const privacyMode = settings.privacyModeEnabled || false;
 
   // Faturamento Mensal (últimos 12 meses)
   const monthlyRevenueMap = jobs
-    .filter(job => job.paidAt)
+    .filter(job => job.paymentDate || job.paidAt) // Consider both for flexibility
     .reduce((acc, job) => {
       try {
-        const date = new Date(job.paidAt!);
-        if (isNaN(date.getTime())) return acc; // Skip invalid dates
+        const date = new Date(job.paymentDate || job.paidAt!);
+        if (isNaN(date.getTime())) return acc; 
 
         const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // 01, 02, ..., 12
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
         const yearMonthKey = `${year}-${month}`; 
         
         acc[yearMonthKey] = (acc[yearMonthKey] || 0) + job.value;
       } catch (e) {
-        console.warn("Error processing job.paidAt for revenue", job.paidAt, e);
+        console.warn("Error processing job.paidAt/paymentDate for revenue", job.id, e);
       }
       return acc;
     }, {} as { [key: string]: number });
 
   const revenueData = Object.entries(monthlyRevenueMap)
     .map(([yearMonthKey, revenue]) => {
-      // Format YYYY-MM to "mmm/yy" for display
       const [yearStr, monthStr] = yearMonthKey.split('-');
       const dateForFormatting = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
       const displayName = dateForFormatting.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       return { key: yearMonthKey, name: displayName, Receita: revenue };
     })
-    .sort((a, b) => a.key.localeCompare(b.key)) // Sort by YYYY-MM
-    .slice(-12); // Take the last 12 months (most recent)
+    .sort((a, b) => a.key.localeCompare(b.key)) 
+    .slice(-12);
 
 
   // Top Clientes por Receita
   const clientRevenue = clients.map(client => {
     const total = jobs
-      .filter(job => job.clientId === client.id && job.paidAt)
+      .filter(job => job.clientId === client.id && (job.paymentDate || job.paidAt))
       .reduce((sum, job) => sum + job.value, 0);
     return { name: client.name, value: total };
-  }).filter(c => c.value > 0).sort((a,b) => b.value - a.value).slice(0,5); // Top 5
+  }).filter(c => c.value > 0).sort((a,b) => b.value - a.value).slice(0,5); 
 
   // Top Serviços por Receita
   const serviceRevenue = Object.values(ServiceType).map(service => {
     const total = jobs
-      .filter(job => job.serviceType === service && job.paidAt)
+      .filter(job => job.serviceType === service && (job.paymentDate || job.paidAt))
       .reduce((sum, job) => sum + job.value, 0);
     return { name: service, value: total };
   }).filter(s => s.value > 0);
@@ -82,17 +86,17 @@ const PerformancePage: React.FC = () => {
   const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   // Valor Médio por Job
-  const paidJobs = jobs.filter(job => job.paidAt);
-  const averageJobValue = paidJobs.length > 0 ? paidJobs.reduce((sum, job) => sum + job.value, 0) / paidJobs.length : 0;
+  const paidJobsList = jobs.filter(job => job.paymentDate || job.paidAt);
+  const averageJobValue = paidJobsList.length > 0 ? paidJobsList.reduce((sum, job) => sum + job.value, 0) / paidJobsList.length : 0;
 
-  // Tempo Médio de Conclusão (do createdAt até paidAt para jobs pagos)
-  const completedJobsWithTimes = paidJobs.filter(job => job.createdAt && job.paidAt);
+  // Tempo Médio de Conclusão (do createdAt até paymentDate/paidAt para jobs pagos)
+  const completedJobsWithTimes = paidJobsList.filter(job => job.createdAt && (job.paymentDate || job.paidAt));
   const averageCompletionTime = completedJobsWithTimes.length > 0 
     ? completedJobsWithTimes.reduce((sum, job) => {
         try {
           const start = new Date(job.createdAt!).getTime();
-          const end = new Date(job.paidAt!).getTime();
-          if (isNaN(start) || isNaN(end)) return sum; // Skip if dates are invalid
+          const end = new Date(job.paymentDate || job.paidAt!).getTime();
+          if (isNaN(start) || isNaN(end)) return sum; 
           return sum + (end - start);
         } catch (e) {
           console.warn("Error calculating completion time for job", job.id, e);
@@ -102,12 +106,21 @@ const PerformancePage: React.FC = () => {
     : 0;
 
 
+  const currencyTooltipFormatter = (value: number) => {
+    return [formatCurrency(value, privacyMode), "Receita"];
+  }
+  const currencyAxisTickFormatter = (value: number) => {
+      if (privacyMode) return 'R$•••';
+      return `R$${value/1000}k`;
+  }
+
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Painel de Desempenho</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <KPICard title="Valor Médio por Job" value={averageJobValue} unit="R$" />
+        <KPICard title="Valor Médio por Job" value={averageJobValue} isCurrency={true} privacyModeEnabled={privacyMode} unit="R$" />
         <KPICard title="Tempo Médio de Conclusão" value={averageCompletionTime.toFixed(1)} unit="dias" />
       </div>
 
@@ -118,8 +131,8 @@ const PerformancePage: React.FC = () => {
               <BarChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis tickFormatter={(value) => `R$${value/1000}k`} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, "Receita"]} />
+                <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
                 <Bar dataKey="Receita" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -131,12 +144,20 @@ const PerformancePage: React.FC = () => {
            {clientRevenue.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={clientRevenue} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                <Pie 
+                    data={clientRevenue} 
+                    dataKey="value" 
+                    nameKey="name" 
+                    cx="50%" cy="50%" 
+                    outerRadius={100} 
+                    labelLine={false} 
+                    label={({ name, percent }) => privacyMode ? `${name} (•••%)` : `${name} (${(percent * 100).toFixed(0)}%)`}
+                >
                   {clientRevenue.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}/>
+                <Tooltip formatter={(value: number) => formatCurrency(value, privacyMode)}/>
                 <Legend wrapperStyle={{fontSize: "14px"}}/>
               </PieChart>
             </ResponsiveContainer>
@@ -148,9 +169,9 @@ const PerformancePage: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
                <BarChart data={serviceRevenue} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" tickFormatter={(value) => `R$${value/1000}k`} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <XAxis type="number" tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <YAxis type="category" dataKey="name" width={80} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, "Receita"]} />
+                <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}}/>
                 <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} barSize={25}/>
               </BarChart>

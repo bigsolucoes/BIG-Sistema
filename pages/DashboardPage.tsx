@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { Job, JobStatus } from '../types';
+import { Job, JobStatus }
+from '../types';
 import { PlusCircleIcon, CurrencyDollarIcon, ClockIcon, CheckCircleIcon, BriefcaseIcon, UsersIcon } from '../constants';
 import Modal from '../components/Modal';
 import JobForm from './forms/JobForm'; 
@@ -8,9 +10,10 @@ import ClientForm from './forms/ClientForm';
 import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { formatCurrency, formatDate } from '../utils/formatters';
 
 const DashboardPage: React.FC = () => {
-  const { jobs, clients, settings, loading } = useAppData(); // Added settings
+  const { jobs, clients, settings, loading } = useAppData();
   const [isJobModalOpen, setJobModalOpen] = React.useState(false);
   const [isClientModalOpen, setClientModalOpen] = React.useState(false);
 
@@ -30,7 +33,8 @@ const DashboardPage: React.FC = () => {
   const receivedLast30Days = jobs
     .filter(job => {
         try {
-            return job.paidAt && new Date(job.paidAt) >= thirtyDaysAgo;
+            // job.paidAt is used for general "is paid" check, paymentDate for actual date of payment
+            return (job.paidAt || job.paymentDate) && new Date(job.paymentDate || job.paidAt!) >= thirtyDaysAgo;
         } catch (e) { return false; }
     })
     .reduce((sum, job) => sum + job.value, 0);
@@ -48,7 +52,7 @@ const DashboardPage: React.FC = () => {
           acc.AguardandoAprovação = (acc.AguardandoAprovação || 0) + 1;
         }
          else {
-          acc.EmAndamento = (acc.EmAndamento || 0) + 1;
+          acc.EmAndamento = (acc.EmAndamento || 0) + 1; // Includes BRIEFING, PRODUCTION
         }
     } catch(e) {
         console.warn("Error processing job status for dashboard", job.id, e);
@@ -84,7 +88,8 @@ const DashboardPage: React.FC = () => {
         return 'Data inválida';
       }
       
-      const deadlineDayStart = new Date(deadlineDate.setHours(0,0,0,0));
+      const deadlineDayStart = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
+
 
       if (deadlineDayStart < todayStart) return 'Atrasado';
       if (deadlineDayStart.getTime() === todayStart.getTime()) return 'Hoje';
@@ -99,12 +104,15 @@ const DashboardPage: React.FC = () => {
     }
   };
   
-  const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; color?: string }> = ({ title, value, icon, color = 'text-accent' }) => (
+  const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; isCurrency?: boolean; color?: string }> = 
+    ({ title, value, icon, isCurrency = false, color = 'text-accent' }) => (
     <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-text-secondary font-medium">{title}</p>
-          <p className="text-2xl font-bold text-text-primary">{typeof value === 'number' ? `R$ ${value.toLocaleString('pt-BR')}` : value}</p>
+          <p className="text-2xl font-bold text-text-primary">
+            {isCurrency ? formatCurrency(typeof value === 'number' ? value : parseFloat(value.toString()), settings.privacyModeEnabled) : value}
+          </p>
         </div>
         <div className={`p-3 rounded-full bg-opacity-20 ${color.startsWith('text-') ? `${color.replace('text-', 'bg-')} ${color}` : `bg-${color}-500 text-${color}-500`}`}>{icon}</div>
       </div>
@@ -124,7 +132,7 @@ const DashboardPage: React.FC = () => {
         <div className="flex space-x-3">
           <button
             onClick={() => setJobModalOpen(true)}
-            className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:bg-opacity-90 transition-colors flex items-center"
+            className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-all flex items-center"
           >
             <PlusCircleIcon /> <span className="ml-2">Novo Job</span>
           </button>
@@ -139,10 +147,10 @@ const DashboardPage: React.FC = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="A Receber" value={totalToReceive} icon={<CurrencyDollarIcon />} color="text-yellow-500" />
-        <StatCard title="Recebido (30 dias)" value={receivedLast30Days} icon={<CheckCircleIcon />} color="text-green-500" />
-        <StatCard title="Jobs Ativos" value={jobs.filter(j => j.status !== JobStatus.PAID && j.status !== JobStatus.FINALIZED).length} icon={<BriefcaseIcon />} />
-        <StatCard title="Total Clientes" value={clients.length} icon={<UsersIcon />} />
+        <StatCard title="A Receber" value={totalToReceive} icon={<CurrencyDollarIcon />} isCurrency={true} color="text-yellow-500" />
+        <StatCard title="Recebido (30 dias)" value={receivedLast30Days} icon={<CheckCircleIcon />} isCurrency={true} color="text-green-500" />
+        <StatCard title="Jobs Ativos" value={jobs.filter(j => j.status !== JobStatus.PAID && j.status !== JobStatus.FINALIZED).length} icon={<BriefcaseIcon />} color="text-blue-500" />
+        <StatCard title="Total Clientes" value={clients.length} icon={<UsersIcon />} color="text-indigo-500" />
       </div>
       
       {/* Job Status & Upcoming Deadlines */}
@@ -170,7 +178,7 @@ const DashboardPage: React.FC = () => {
             <ul className="space-y-3">
               {upcomingDeadlines.map(job => (
                 <li key={job.id} className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <Link to={`/jobs`} className="block">
+                  <Link to={`/jobs`} className="block"> {/* Consider linking to job detail if available */}
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-text-primary">{job.name}</span>
                       <span className={`text-sm font-semibold ${new Date(job.deadline) < todayStart && job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED ? 'text-red-500' : 'text-accent'}`}>
@@ -178,6 +186,7 @@ const DashboardPage: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-xs text-text-secondary">{clients.find(c => c.id === job.clientId)?.name || 'Cliente desconhecido'}</p>
+                    <p className="text-xs text-text-secondary">Prazo: {formatDate(job.deadline)}</p>
                   </Link>
                 </li>
               ))}
