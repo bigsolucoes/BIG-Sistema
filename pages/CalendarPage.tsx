@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import toast from 'react-hot-toast';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon, SettingsIcon } from '../constants'; // Page and navigation icons
 import { Link } from 'react-router-dom';
-import { formatDate } from '../../utils/formatters'; // Import formatDate
+import { formatDate } from '@/utils/formatters'; // Import formatDate using path alias
 
 const CalendarPage: React.FC = () => {
   const { settings, updateSettings } = useAppData();
