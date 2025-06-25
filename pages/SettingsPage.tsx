@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import toast from 'react-hot-toast';
@@ -9,7 +10,7 @@ const SettingsPage: React.FC = () => {
   
   const [customLogoPreview, setCustomLogoPreview] = useState<string | undefined>(settings.customLogo);
   const [asaasUrlInput, setAsaasUrlInput] = useState(settings.asaasUrl || '');
-  const [googleDriveUrlInput, setGoogleDriveUrlInput] = useState(settings.googleDriveUrl || '');
+  // const [googleDriveUrlInput, setGoogleDriveUrlInput] = useState(settings.googleDriveUrl || ''); // Removed
   const [userNameInput, setUserNameInput] = useState(settings.userName || '');
   const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#FFFFFF');
   const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#007AFF');
@@ -19,7 +20,7 @@ const SettingsPage: React.FC = () => {
     if (!loading) {
       setCustomLogoPreview(settings.customLogo);
       setAsaasUrlInput(settings.asaasUrl || 'https://www.asaas.com/login');
-      setGoogleDriveUrlInput(settings.googleDriveUrl || 'https://drive.google.com');
+      // setGoogleDriveUrlInput(settings.googleDriveUrl || 'https://drive.google.com'); // Removed
       setUserNameInput(settings.userName || '');
       setPrimaryColorInput(settings.primaryColor || '#FFFFFF');
       setAccentColorInput(settings.accentColor || '#007AFF');
@@ -72,10 +73,7 @@ const SettingsPage: React.FC = () => {
             toast.error('URL do Asaas inválida. Deve começar com http:// ou https://');
             return;
         }
-        if (googleDriveUrlInput && !isValidHttpUrl(googleDriveUrlInput)) {
-            toast.error('URL do Google Drive inválida. Deve começar com http:// ou https://');
-            return;
-        }
+        // Google Drive URL validation removed
     } catch(e) {
         toast.error('Formato de URL inválido.');
         return;
@@ -84,7 +82,7 @@ const SettingsPage: React.FC = () => {
     updateSettings({
       customLogo: customLogoPreview,
       asaasUrl: asaasUrlInput || undefined, 
-      googleDriveUrl: googleDriveUrlInput || undefined,
+      // googleDriveUrl: googleDriveUrlInput || undefined, // Removed
       userName: userNameInput || undefined,
       primaryColor: primaryColorInput,
       accentColor: accentColorInput,
@@ -189,7 +187,7 @@ const SettingsPage: React.FC = () => {
       </div>
 
       <div className={sectionCardClass}>
-        <h2 className="text-xl font-semibold text-text-primary mb-4 flex items-center"><LinkIcon size={22} className="mr-2 text-accent"/>URLs Externas (Iframes)</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-4 flex items-center"><LinkIcon size={22} className="mr-2 text-accent"/>Links Externos</h2>
         <div className="space-y-4">
           <div>
             <label htmlFor="asaasUrl" className="block text-sm font-medium text-text-secondary mb-1">URL da Página de Pagamentos (Asaas)</label>
@@ -203,18 +201,7 @@ const SettingsPage: React.FC = () => {
             />
              <p className="text-xs text-text-secondary mt-1">Deixe em branco para usar a URL padrão.</p>
           </div>
-          <div>
-            <label htmlFor="googleDriveUrl" className="block text-sm font-medium text-text-secondary mb-1">URL da Página de Arquivos (Google Drive)</label>
-            <input 
-              type="url" 
-              id="googleDriveUrl" 
-              value={googleDriveUrlInput} 
-              onChange={(e) => setGoogleDriveUrlInput(e.target.value)} 
-              className={commonInputClass}
-              placeholder="Ex: https://drive.google.com"
-            />
-            <p className="text-xs text-text-secondary mt-1">Deixe em branco para usar a URL padrão.</p>
-          </div>
+          {/* Google Drive URL input removed */}
         </div>
       </div>
 

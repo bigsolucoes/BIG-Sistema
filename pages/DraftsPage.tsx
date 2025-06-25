@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { DraftNote } from '../types';
-import { PlusCircleIcon, BotIcon, TrashIcon, PencilIcon, SaveIcon, XIcon, DraftIcon } from '../constants';
+import { PlusCircleIcon, BotIcon, TrashIcon, PencilIcon, SaveIcon, XIcon, DraftIcon, ImageUpIcon, ImageOffIcon } from '../constants';
 import toast from 'react-hot-toast';
 import { formatDate } from '../utils/formatters';
 import Modal from '../components/Modal'; // Assuming Modal component exists
@@ -14,14 +15,20 @@ const DraftsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [editImageBase64, setEditImageBase64] = useState<string | undefined>(undefined);
+  const [editImageMimeType, setEditImageMimeType] = useState<string | undefined>(undefined);
   const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     if (selectedDraft && isEditing) {
       setEditTitle(selectedDraft.title);
       setEditContent(selectedDraft.content);
+      setEditImageBase64(selectedDraft.imageBase64);
+      setEditImageMimeType(selectedDraft.imageMimeType);
     } else if (!selectedDraft) {
       setIsEditing(false); // Reset editing state if no draft is selected
+      setEditImageBase64(undefined);
+      setEditImageMimeType(undefined);
     }
   }, [selectedDraft, isEditing]);
 
@@ -29,21 +36,49 @@ const DraftsPage: React.FC = () => {
     const newDraft = addDraftNote({ title: 'Novo Rascunho', content: '' });
     setSelectedDraft(newDraft);
     setIsEditing(true);
+    setEditImageBase64(undefined);
+    setEditImageMimeType(undefined);
   };
 
   const handleSelectDraft = (draft: DraftNote) => {
     if (isEditing && selectedDraft && selectedDraft.id !== draft.id) {
-      // If currently editing a different draft, prompt to save or discard
       if (window.confirm("Você tem alterações não salvas no rascunho atual. Deseja descartá-las e abrir outro rascunho?")) {
-        // Discard changes, select new draft
-        setIsEditing(false); // Exit edit mode for the old draft
+        setIsEditing(false); 
         setSelectedDraft(draft);
+        setEditImageBase64(draft.imageBase64);
+        setEditImageMimeType(draft.imageMimeType);
       }
-      // If user cancels, do nothing.
     } else {
         setSelectedDraft(draft);
-        setIsEditing(false); // View mode by default
+        setIsEditing(false); 
+        setEditImageBase64(draft.imageBase64);
+        setEditImageMimeType(draft.imageMimeType);
     }
+  };
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 1 * 1024 * 1024) { // 1MB limit for "low quality"
+        toast.error('Imagem muito grande. Máximo 1MB.');
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+        toast.error('Formato de imagem inválido. Use JPEG, PNG, GIF ou WebP.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditImageBase64(reader.result as string);
+        setEditImageMimeType(file.type);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setEditImageBase64(undefined);
+    setEditImageMimeType(undefined);
   };
 
   const handleSaveChanges = () => {
@@ -52,8 +87,15 @@ const DraftsPage: React.FC = () => {
       toast.error('O título não pode ficar vazio.');
       return;
     }
-    updateDraftNote({ ...selectedDraft, title: editTitle, content: editContent });
-    setSelectedDraft(prev => prev ? {...prev, title: editTitle, content: editContent, updatedAt: new Date().toISOString()} : null);
+    const updatedDraftData: DraftNote = { 
+      ...selectedDraft, 
+      title: editTitle, 
+      content: editContent,
+      imageBase64: editImageBase64,
+      imageMimeType: editImageMimeType,
+    };
+    updateDraftNote(updatedDraftData);
+    setSelectedDraft(prev => prev ? {...updatedDraftData, updatedAt: new Date().toISOString()} : null);
     setIsEditing(false);
     toast.success('Rascunho salvo!');
   };
@@ -72,27 +114,11 @@ const DraftsPage: React.FC = () => {
   const handleInvokeAI = async () => {
     if (!selectedDraft || !isEditing) return;
     setIsAiLoading(true);
-    // Placeholder for AI integration
-    // const aiPrompt = `Continue ou melhore o seguinte texto:\n${editContent}`;
-    try {
-        // // When ready, uncomment and use:
-        // const response = await callGeminiApi(aiPrompt, { jobs: [], clients: [] }); // Provide relevant context if needed
-        // const aiGeneratedText = response.text;
-        // setEditContent(prev => prev + "\n\n" + aiGeneratedText);
-        // toast.success("Texto gerado pela IA!");
-
-        // Placeholder logic:
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-        const placeholderText = "\n\n[Texto gerado pela IA placeholder... Lorem ipsum dolor sit amet.]";
-        setEditContent(prev => prev + placeholderText);
-        toast.success("Assistente AI adicionou texto (placeholder).");
-
-    } catch (error) {
-        console.error("AI Error:", error);
-        toast.error("Erro ao contatar o assistente AI.");
-    } finally {
-        setIsAiLoading(false);
-    }
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    const placeholderText = "\n\n[Texto gerado pela IA placeholder... Lorem ipsum dolor sit amet.]";
+    setEditContent(prev => prev + placeholderText);
+    toast.success("Assistente AI adicionou texto (placeholder).");
+    setIsAiLoading(false);
   };
 
 
@@ -178,7 +204,7 @@ const DraftsPage: React.FC = () => {
                  </button>
                 {isEditing && (
                     <button
-                        onClick={() => { setIsEditing(false); setEditTitle(selectedDraft.title); setEditContent(selectedDraft.content); }}
+                        onClick={() => { setIsEditing(false); setEditTitle(selectedDraft.title); setEditContent(selectedDraft.content); setEditImageBase64(selectedDraft.imageBase64); setEditImageMimeType(selectedDraft.imageMimeType);}}
                         className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full"
                         title="Cancelar Edição"
                     >
@@ -192,6 +218,37 @@ const DraftsPage: React.FC = () => {
               Criado: {formatDate(selectedDraft.createdAt, {dateStyle: 'medium', timeStyle: 'short'})} | 
               Última Modificação: {formatDate(selectedDraft.updatedAt, {dateStyle: 'medium', timeStyle: 'short'})}
             </div>
+
+            {/* Image Display/Upload Section */}
+            {isEditing ? (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-text-secondary mb-1">Imagem (Opcional, máx 1MB)</label>
+                {editImageBase64 && editImageMimeType && (
+                  <div className="mb-2 relative group">
+                    <img src={editImageBase64} alt="Preview do Rascunho" className="max-h-48 w-auto border border-border-color rounded" />
+                    <button 
+                      onClick={handleRemoveImage} 
+                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remover Imagem"
+                    >
+                      <ImageOffIcon size={16} />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center">
+                    <label htmlFor="imageUpload" className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-text-secondary px-3 py-2 rounded-md text-sm flex items-center transition-colors">
+                        <ImageUpIcon size={18} className="mr-2"/> {editImageBase64 ? 'Alterar Imagem' : 'Adicionar Imagem'}
+                    </label>
+                    <input type="file" id="imageUpload" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageUpload} className="hidden" />
+                </div>
+              </div>
+            ) : (
+              selectedDraft.imageBase64 && selectedDraft.imageMimeType && (
+                <div className="mb-4">
+                  <img src={selectedDraft.imageBase64} alt="Imagem do Rascunho" className="max-h-60 w-auto border border-border-color rounded" />
+                </div>
+              )
+            )}
 
             {isEditing ? (
               <textarea

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
@@ -11,8 +12,7 @@ import PerformancePage from './pages/PerformancePage';
 import CommunicationPage from './pages/CommunicationPage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
-import AsaasPaymentPage from './pages/AsaasPaymentPage';
-import GoogleDrivePage from './pages/GoogleDrivePage';
+// import GoogleDrivePage from './pages/GoogleDrivePage'; // Removed
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -45,8 +45,7 @@ const MainLayout: React.FC = () => {
             <Route path="/archive" element={<ArchivePage />} />
             <Route path="/communication" element={<CommunicationPage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
-            <Route path="/asaas" element={<AsaasPaymentPage />} />
-            <Route path="/drive" element={<GoogleDrivePage />} />
+            {/* <Route path="/drive" element={<GoogleDrivePage />} /> */} {/* Removed Drive Route */}
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>

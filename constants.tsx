@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { JobStatus, ServiceType } from './types';
 import { 
   Home, Briefcase, Users, CreditCard, BarChartBig, MessageCircle, Link2, FolderArchive, 
   Sparkles, Cog, PlusCircle, X, Trash2, Edit3, CheckCircle, AlertCircle, Clock, 
   DollarSign, Eye, EyeOff, List, ArrowRight, Settings, CalendarDays, Archive as ArchiveIconLucide, FileText, Bot,
-  Save, Check, ChevronLeft, ChevronRight, Wallet // Added Wallet
+  Save, Check, ChevronLeft, ChevronRight, Wallet, ExternalLink, ImageUp, ImageOff // Added Wallet & ExternalLink, ImageUp, ImageOff
 } from 'lucide-react';
 
 export const APP_NAME = "BIG";
@@ -42,6 +43,9 @@ export const CheckIcon = Check; // Newly added
 export const ChevronLeftIcon = ChevronLeft; // Newly added
 export const ChevronRightIcon = ChevronRight; // Newly added
 export const WalletIcon = Wallet; // Newly added for "A Receber"
+export const ExternalLinkIcon = ExternalLink; // Added for Asaas link
+export const ImageUpIcon = ImageUp; // For adding/uploading image
+export const ImageOffIcon = ImageOff; // For removing image
 
 
 // Specific use case icons, might be same as above but named for clarity
@@ -62,8 +66,8 @@ export const NAVIGATION_ITEMS = [
   { name: 'Rascunho', path: '/drafts', icon: DraftIcon },
   // { name: 'Arquivo Morto', path: '/archive', icon: ArchiveIcon }, // Removed from main menu
   { name: 'WhatsApp', path: '/communication', icon: WhatsAppIcon },
-  { name: 'Pagamentos (Asaas)', path: '/asaas', icon: LinkIcon },
-  { name: 'Arquivos (Drive)', path: '/drive', icon: FolderIcon },
+  // { name: 'Pagamentos (Asaas)', path: '/asaas', icon: LinkIcon }, // Removed Asaas Iframe link
+  // { name: 'Drive', path: '/drive', icon: FolderIcon }, // Removed Drive from main navigation
   { name: 'Assistente AI', path: '/ai-assistant', icon: SparklesIcon },
   // { name: 'Configurações', path: '/settings', icon: SettingsIcon }, // Removed from sidebar
 ];

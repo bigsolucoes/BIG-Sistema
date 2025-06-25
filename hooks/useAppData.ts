@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Job, Client, ServiceType, JobStatus, AppSettings, JobObservation, DraftNote } from '../types';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
@@ -23,7 +24,7 @@ interface AppDataContextType {
   deleteClient: (clientId: string) => void;
   getClientById: (clientId: string) => Client | undefined;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
-  addDraftNote: (draft: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt'>) => DraftNote;
+  addDraftNote: (draft: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt' | 'imageBase64' | 'imageMimeType'>) => DraftNote;
   updateDraftNote: (draft: DraftNote) => void;
   deleteDraftNote: (draftId: string) => void;
   loading: boolean;
@@ -44,14 +45,14 @@ const initialClients: Client[] = [
 ];
 
 const initialDraftNotes: DraftNote[] = [
-    {id: uuidv4(), title: "Ideias Brainstorm", content: "Primeira ideia para o projeto X...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()},
-    {id: uuidv4(), title: "Roteiro Vídeo Y", content: "Cena 1: Abertura...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()},
+    {id: uuidv4(), title: "Ideias Brainstorm", content: "Primeira ideia para o projeto X...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), imageBase64: undefined, imageMimeType: undefined},
+    {id: uuidv4(), title: "Roteiro Vídeo Y", content: "Cena 1: Abertura...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), imageBase64: undefined, imageMimeType: undefined},
 ];
 
 const initialSettings: AppSettings = {
   customLogo: undefined,
   asaasUrl: 'https://www.asaas.com/login',
-  googleDriveUrl: 'https://drive.google.com',
+  // googleDriveUrl: 'https://drive.google.com', // Removed
   userName: '',
   primaryColor: DEFAULT_PRIMARY_COLOR,
   accentColor: DEFAULT_ACCENT_COLOR,
@@ -94,7 +95,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       })));
 
       setClients(storedClients ? JSON.parse(storedClients) : initialClients);
-      setDraftNotes(storedDrafts ? JSON.parse(storedDrafts) : initialDraftNotes);
+      
+      const parsedDrafts = storedDrafts ? JSON.parse(storedDrafts) : initialDraftNotes;
+      setDraftNotes(parsedDrafts.map((draft: any) => ({
+        ...draft,
+        imageBase64: draft.imageBase64 || undefined,
+        imageMimeType: draft.imageMimeType || undefined,
+      })));
       
       const loadedSettings = storedSettings ? JSON.parse(storedSettings) : initialSettings;
       setSettings({
@@ -103,7 +110,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         splashScreenBackgroundColor: loadedSettings.splashScreenBackgroundColor || DEFAULT_SPLASH_BACKGROUND_COLOR,
         customLogo: loadedSettings.customLogo,
         asaasUrl: loadedSettings.asaasUrl || 'https://www.asaas.com/login',
-        googleDriveUrl: loadedSettings.googleDriveUrl || 'https://drive.google.com',
+        // googleDriveUrl: loadedSettings.googleDriveUrl || 'https://drive.google.com', // Removed
         userName: loadedSettings.userName || '',
         privacyModeEnabled: loadedSettings.privacyModeEnabled === undefined ? false : loadedSettings.privacyModeEnabled,
         googleCalendarConnected: loadedSettings.googleCalendarConnected === undefined ? false : loadedSettings.googleCalendarConnected,
@@ -121,7 +128,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         createCalendarEvent: job.createCalendarEvent === undefined ? false : job.createCalendarEvent,
       })));
       setClients(initialClients);
-      setDraftNotes(initialDraftNotes);
+      setDraftNotes(initialDraftNotes.map(draft => ({
+        ...draft,
+        imageBase64: draft.imageBase64 || undefined,
+        imageMimeType: draft.imageMimeType || undefined,
+      })));
       setSettings(initialSettings);
     } finally {
       setLoading(false);
@@ -204,12 +215,14 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSettings(prev => ({ ...prev, ...newSettings }));
   }, []);
 
-  const addDraftNote = useCallback((draftData: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt'>): DraftNote => {
+  const addDraftNote = useCallback((draftData: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt' | 'imageBase64' | 'imageMimeType'>): DraftNote => {
     const newDraft: DraftNote = {
       ...draftData,
       id: uuidv4(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      imageBase64: undefined,
+      imageMimeType: undefined,
     };
     setDraftNotes(prev => [newDraft, ...prev]); // Add to beginning of list
     return newDraft;

@@ -99,7 +99,7 @@ export interface GroundingChunk {
 export interface AppSettings {
   customLogo?: string; // base64 string
   asaasUrl?: string;
-  googleDriveUrl?: string;
+  // googleDriveUrl?: string; // Removed
   userName?: string; // This is for display name in dashboard, not auth username
   primaryColor?: string;
   accentColor?: string;
@@ -119,4 +119,6 @@ export interface DraftNote {
   content: string;
   createdAt: string;
   updatedAt: string;
+  imageBase64?: string; // For storing the low-quality image
+  imageMimeType?: string; // To correctly display the image
 }
