@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import DashboardPage from './pages/DashboardPage';
@@ -13,24 +13,21 @@ import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
 import AsaasPaymentPage from './pages/AsaasPaymentPage';
 import GoogleDrivePage from './pages/GoogleDrivePage';
-import { AppDataProvider, useAppData } from './hooks/useAppData';
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import CalendarPage from './pages/CalendarPage'; // New
+import ArchivePage from './pages/ArchivePage';   // New
+import DraftsPage from './pages/DraftsPage';     // New
+import { useAppData } from './hooks/useAppData';
+import { useAuth } from './hooks/useAuth';
 import { Toaster } from 'react-hot-toast';
-import BrandingSplashScreen from './components/BrandingSplashScreen'; 
-// import LoadingSplashScreen from './components/LoadingSplashScreen'; // Removed
+import BrandingSplashScreen from './components/BrandingSplashScreen';
 
-// This component remains largely the same, but its visibility is controlled by the App component.
-const AppContent: React.FC<{ appContentVisible: boolean }> = ({ appContentVisible }) => {
-  const { loading: appDataLoading } = useAppData();
-
-  // If appDataLoading is true, content might render with empty states briefly.
-  // The LoadingSplashScreen was removed as per request.
-  // if (appDataLoading) {
-  //   return null; // Or a very minimal text loader if desired, but not the full component
-  // }
-
+const MainLayout: React.FC = () => {
   return (
     <div 
-      className={`flex flex-col h-screen bg-main-bg text-text-primary transition-opacity duration-500 ease-in-out ${appContentVisible ? 'opacity-100' : 'opacity-0'}`}
+      className="flex flex-col h-screen bg-main-bg text-text-primary" 
     >
       <Header />
       <div className="flex flex-1 overflow-hidden">
@@ -43,11 +40,15 @@ const AppContent: React.FC<{ appContentVisible: boolean }> = ({ appContentVisibl
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/financials" element={<FinancialsPage />} />
             <Route path="/performance" element={<PerformancePage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/drafts" element={<DraftsPage />} />
+            <Route path="/archive" element={<ArchivePage />} />
             <Route path="/communication" element={<CommunicationPage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
             <Route path="/asaas" element={<AsaasPaymentPage />} />
             <Route path="/drive" element={<GoogleDrivePage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
       </div>
@@ -56,63 +57,102 @@ const AppContent: React.FC<{ appContentVisible: boolean }> = ({ appContentVisibl
   );
 };
 
-const App: React.FC = () => {
+const useAppVisibility = () => {
   const [appPhase, setAppPhase] = useState<'initial' | 'branding' | 'fading' | 'application'>('initial');
+  const { currentUser, loading: authLoading } = useAuth();
+  const location = useLocation();
+
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   useEffect(() => {
-    if (appPhase === 'initial') {
+    let newCalculatedPhase = appPhase;
+
+    if (authLoading) {
+      newCalculatedPhase = 'initial';
+    } else if (isAuthPage) {
+      newCalculatedPhase = 'application';
+    } else if (currentUser) { // Authenticated and not on an auth page
       const brandingSplashShownThisSession = sessionStorage.getItem('brandingSplashShown');
       if (brandingSplashShownThisSession) {
-        setAppPhase('application'); // Skip branding, go straight to app
+        newCalculatedPhase = 'application'; // Branding done, go to app
       } else {
-        setAppPhase('branding'); // Start branding phase
+        // If not shown, and we are not already in branding/fading, start branding.
+        // This handles transition from 'initial' or 'application' (e.g. after login) to 'branding'.
+        // If we are already 'branding' or 'fading', this logic won't change it, letting the timer effect proceed.
+        if (appPhase !== 'branding' && appPhase !== 'fading') {
+          newCalculatedPhase = 'branding';
+        }
       }
+    } else { // Not authenticated and not on an auth page
+      newCalculatedPhase = 'application'; // Shell needs to be visible for redirect by ProtectedRoute
     }
-  }, [appPhase]);
+    
+    if (newCalculatedPhase !== appPhase) {
+      setAppPhase(newCalculatedPhase);
+    }
+
+  }, [appPhase, currentUser, authLoading, isAuthPage, location]);
 
   useEffect(() => {
-    let brandingDisplayTimer: NodeJS.Timeout | undefined;
-    let fadeTransitionTimer: NodeJS.Timeout | undefined;
+    let brandingDisplayTimer: ReturnType<typeof setTimeout> | undefined;
+    let fadeTransitionTimer: ReturnType<typeof setTimeout> | undefined;
 
-    if (appPhase === 'branding') {
-      brandingDisplayTimer = setTimeout(() => {
-        setAppPhase('fading'); // Move to fading phase after 2 seconds
-      }, 2000);
-    } else if (appPhase === 'fading') {
-      fadeTransitionTimer = setTimeout(() => {
-        setAppPhase('application'); // Move to application phase after 0.5 seconds
-        sessionStorage.setItem('brandingSplashShown', 'true');
-      }, 500);
+    if (currentUser && !isAuthPage) {
+      if (appPhase === 'branding') {
+        brandingDisplayTimer = setTimeout(() => {
+          setAppPhase('fading');
+        }, 2000);
+      } else if (appPhase === 'fading') {
+        fadeTransitionTimer = setTimeout(() => {
+          setAppPhase('application');
+          sessionStorage.setItem('brandingSplashShown', 'true');
+        }, 500);
+      }
     }
 
     return () => {
       if (brandingDisplayTimer) clearTimeout(brandingDisplayTimer);
       if (fadeTransitionTimer) clearTimeout(fadeTransitionTimer);
     };
-  }, [appPhase]);
+  }, [appPhase, currentUser, isAuthPage]);
 
-  // Determine what to render based on appPhase
-  let brandingElement = null;
-  if (appPhase === 'branding' || appPhase === 'fading') {
-    brandingElement = <BrandingSplashScreen isFadingOut={appPhase === 'fading'} />;
-  }
 
-  let appContentElement = null;
-  // AppContent is rendered and becomes visible during 'fading' and 'application' phases
-  if (appPhase === 'fading' || appPhase === 'application') {
-    // The `appContentVisible` prop being true will trigger the fade-in animation within AppContent
-    appContentElement = <AppContent appContentVisible={true} />;
-  }
+  const showBrandingSplash = (appPhase === 'branding' || appPhase === 'fading') && currentUser && !isAuthPage;
+  const appContentVisible = isAuthPage || (appPhase === 'fading' || appPhase === 'application');
 
-  if (appPhase === 'initial') {
-    return null; // Or a minimal non-styled loader for the brief session check.
+  return { appPhase, showBrandingSplash, appContentVisible, isAuthPage };
+};
+
+
+const App: React.FC = () => {
+  return <AppRouter />;
+};
+
+const AppRouter: React.FC = () => {
+  const { appPhase, showBrandingSplash, appContentVisible, isAuthPage } = useAppVisibility();
+  // Settings are used by BrandingSplashScreen internally, no need to pass from here or gate on settingsLoading.
+
+  if (isAuthPage) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Routes>
+    );
   }
 
   return (
-    <AppDataProvider>
-      {brandingElement}
-      {appContentElement}
-    </AppDataProvider>
+    <>
+      {showBrandingSplash && <BrandingSplashScreen isFadingOut={appPhase === 'fading'} />}
+       <div className={`transition-opacity duration-500 ease-in-out ${appContentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none fixed inset-0'}`}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/*" element={<MainLayout />} />
+          </Route>
+           <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </div>
+    </>
   );
 };
 

@@ -30,7 +30,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
             className="text-text-secondary hover:text-accent p-1 rounded-full transition-colors"
             aria-label="Close modal"
           >
-            <XIcon />
+            <XIcon size={24} /> {/* Ensure size is appropriate */}
           </button>
         </div>
         <div>{children}</div>

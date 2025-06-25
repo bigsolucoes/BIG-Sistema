@@ -1,15 +1,21 @@
+
 export enum ServiceType {
   VIDEO = 'Vídeo',
   PHOTO = 'Fotografia',
   DESIGN = 'Design',
+  SITES = 'Sites',
+  AUXILIAR_T = 'Auxiliar T.',
+  FRELLA = 'Frella',
+  PROGRAMACAO = 'Programação',
+  REDACAO = 'Redação',
   OTHER = 'Outro',
 }
 
 export enum JobStatus {
-  BRIEFING = 'Briefing', // A Fazer
-  PRODUCTION = 'Produção', // Em Progresso
+  BRIEFING = 'Briefing',
+  PRODUCTION = 'Produção',
   REVIEW = 'Revisão',
-  FINALIZED = 'Finalizado', // Concluído
+  FINALIZED = 'Finalizado',
   PAID = 'Pago',
 }
 
@@ -19,9 +25,15 @@ export interface Client {
   company?: string;
   email: string;
   phone?: string;
-  cpf?: string; 
-  observations?: string; 
+  cpf?: string;
+  observations?: string;
   createdAt: string;
+}
+
+export interface JobObservation {
+  id: string;
+  text: string;
+  timestamp: string;
 }
 
 export interface Job {
@@ -32,7 +44,7 @@ export interface Job {
   value: number;
   deadline: string; // ISO string date
   status: JobStatus;
-  cloudLink?: string;
+  cloudLinks?: string[]; 
   createdAt: string;
   paidAt?: string; // ISO string date - Specifically for when payment was made
   notes?: string; // General job notes
@@ -43,6 +55,15 @@ export interface Job {
   paymentAttachmentName?: string; // Filename of the attachment
   paymentAttachmentData?: string; // Optional: base64 data if storing file content
   paymentNotes?: string; // Notes specific to the payment
+
+  // New fields for Lixeira and Observations
+  isDeleted?: boolean;
+  observationsLog?: JobObservation[];
+
+  // New fields for v2.5
+  isPrePaid?: boolean;
+  prePaymentDate?: string; // ISO string date for advance payment
+  createCalendarEvent?: boolean; // For Google Calendar integration
 }
 
 export enum FinancialStatus {
@@ -61,7 +82,7 @@ export interface AIChatMessage {
   text: string;
   sender: 'user' | 'ai';
   timestamp: string;
-  relatedData?: unknown; 
+  relatedData?: unknown;
 }
 
 export interface GroundingChunk {
@@ -79,9 +100,23 @@ export interface AppSettings {
   customLogo?: string; // base64 string
   asaasUrl?: string;
   googleDriveUrl?: string;
-  userName?: string; 
-  primaryColor?: string; 
-  accentColor?: string; 
+  userName?: string; // This is for display name in dashboard, not auth username
+  primaryColor?: string;
+  accentColor?: string;
   splashScreenBackgroundColor?: string;
   privacyModeEnabled?: boolean; // New: For obfuscating monetary values
+  googleCalendarConnected?: boolean; // For GCal integration status
+}
+
+export interface User {
+  id:string;
+  username: string; 
+}
+
+export interface DraftNote {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
 }

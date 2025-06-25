@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AIChatMessage as AIChatMessageType } from '../types';
-import { SparklesIcon } from '../constants'; // Assuming SparklesIcon is appropriate for AI
+import { SparklesIcon } from '../constants'; 
 
 const AIChatMessage: React.FC<{ message: AIChatMessageType }> = ({ message }) => {
   const isUser = message.sender === 'user';
@@ -16,8 +16,8 @@ const AIChatMessage: React.FC<{ message: AIChatMessageType }> = ({ message }) =>
       >
         {!isUser && (
           <div className="flex items-center mb-1 text-xs text-slate-500">
-            <SparklesIcon />
-            <span className="ml-1 font-semibold">Assistente AI</span>
+            <SparklesIcon size={16} className="mr-1" /> {/* Ensure size is appropriate */}
+            <span className="font-semibold">Assistente AI</span>
           </div>
         )}
         <p className="text-sm whitespace-pre-wrap">{message.text}</p>

@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAppData } from '../../hooks/useAppData';
 import { Job, Client, ServiceType, JobStatus } from '../../types';
-import { JOB_STATUS_OPTIONS, SERVICE_TYPE_OPTIONS } from '../../constants';
+import { JOB_STATUS_OPTIONS, SERVICE_TYPE_OPTIONS, LinkIcon, RemoveLinkIcon, CalendarIcon } from '../../constants';
 import toast from 'react-hot-toast';
 
 interface JobFormProps {
@@ -16,10 +15,11 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
   const [clientId, setClientId] = useState<string>('');
   const [serviceType, setServiceType] = useState<ServiceType>(ServiceType.VIDEO);
   const [value, setValue] = useState<number>(0);
-  const [deadline, setDeadline] = useState(''); // Store as YYYY-MM-DD for input
+  const [deadline, setDeadline] = useState('');
   const [status, setStatus] = useState<JobStatus>(JobStatus.BRIEFING);
-  const [cloudLink, setCloudLink] = useState('');
+  const [cloudLinks, setCloudLinks] = useState<string[]>(['', '', '']);
   const [notes, setNotes] = useState('');
+  const [createCalendarEvent, setCreateCalendarEvent] = useState(false);
 
   useEffect(() => {
     if (jobToEdit) {
@@ -28,78 +28,94 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       setServiceType(jobToEdit.serviceType);
       setValue(jobToEdit.value);
       try {
-        if (jobToEdit.deadline) {
-          const d = new Date(jobToEdit.deadline);
-          if (!isNaN(d.getTime())) {
-            setDeadline(d.toISOString().split('T')[0]);
-          } else {
-            setDeadline('');
-            console.warn(`Invalid deadline found for job ${jobToEdit.id}: ${jobToEdit.deadline}`);
-          }
-        } else {
-          setDeadline('');
-        }
+        setDeadline(jobToEdit.deadline ? new Date(jobToEdit.deadline).toISOString().split('T')[0] : '');
       } catch (e) {
-        console.error("Error processing jobToEdit.deadline", e);
-        setDeadline(''); // Fallback
-        toast.error("Erro ao carregar o prazo do job.");
+        setDeadline(''); toast.error("Erro ao carregar prazo.");
       }
       setStatus(jobToEdit.status);
-      setCloudLink(jobToEdit.cloudLink || '');
+      const currentLinks = jobToEdit.cloudLinks || [];
+      setCloudLinks([
+        currentLinks[0] || '',
+        currentLinks[1] || '',
+        currentLinks[2] || '',
+      ]);
       setNotes(jobToEdit.notes || '');
+      setCreateCalendarEvent(jobToEdit.createCalendarEvent || false);
     } else {
-      // Reset all fields for new job form
       setName('');
-      if (clients.length > 0 && clients[0]?.id) {
-          setClientId(clients[0].id);
-      } else {
-          setClientId(''); 
-      }
+      setClientId(clients.length > 0 ? clients[0].id : '');
       setServiceType(ServiceType.VIDEO);
       setValue(0);
       setDeadline('');
       setStatus(JobStatus.BRIEFING);
-      setCloudLink('');
+      setCloudLinks(['', '', '']);
       setNotes('');
+      setCreateCalendarEvent(false);
     }
   }, [jobToEdit, clients]);
+
+  const handleCloudLinkChange = (index: number, val: string) => {
+    const newLinks = [...cloudLinks];
+    newLinks[index] = val;
+    setCloudLinks(newLinks);
+  };
+  
+  const removeCloudLink = (index: number) => {
+    handleCloudLinkChange(index, '');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !clientId || !deadline) {
-      toast.error('Preencha todos os campos obrigatórios (Nome, Cliente, Prazo).');
+      toast.error('Preencha Nome, Cliente e Prazo.');
       return;
     }
-
-    const deadlineDate = new Date(deadline + "T00:00:00.000Z"); 
+    const deadlineDate = new Date(deadline + "T00:00:00.000Z"); // Ensure time is UTC midnight
     if (isNaN(deadlineDate.getTime())) {
       toast.error('Data de prazo inválida.');
       return;
     }
 
-    const jobData = {
+    const finalCloudLinks = cloudLinks.filter(link => link.trim() !== '');
+
+    const jobDataPayload = {
       name,
       clientId,
       serviceType,
       value: Number(value),
       deadline: deadlineDate.toISOString(),
       status,
-      cloudLink: cloudLink || undefined,
+      cloudLinks: finalCloudLinks.length > 0 ? finalCloudLinks : undefined,
       notes: notes || undefined,
+      createCalendarEvent,
     };
 
     if (jobToEdit) {
-      updateJob({ ...jobToEdit, ...jobData });
-      toast.success('Job atualizado com sucesso!');
+      updateJob({ 
+        ...jobToEdit, 
+        ...jobDataPayload, 
+        observationsLog: jobToEdit.observationsLog || [],
+        isDeleted: jobToEdit.isDeleted || false,
+        isPrePaid: jobToEdit.isPrePaid || false,
+        prePaymentDate: jobToEdit.prePaymentDate,
+       });
+      toast.success('Job atualizado!');
+      if (createCalendarEvent) {
+          console.log(`Simulating: Create/Update Google Calendar event for job "${jobDataPayload.name}" on ${jobDataPayload.deadline}`);
+          toast('Evento do Google Calendar seria criado/atualizado (simulado).', {icon: '🗓️'});
+      }
     } else {
-      addJob(jobData);
-      toast.success('Job adicionado com sucesso!');
+      addJob(jobDataPayload);
+      toast.success('Job adicionado!');
+       if (createCalendarEvent) {
+          console.log(`Simulating: Create Google Calendar event for job "${jobDataPayload.name}" on ${jobDataPayload.deadline}`);
+          toast('Evento do Google Calendar seria criado (simulado).', {icon: '🗓️'});
+      }
     }
     onSuccess();
   };
   
-  const commonInputClass = "w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-custom-brown focus:border-custom-brown text-text-primary outline-none transition-shadow bg-card-bg";
-
+  const commonInputClass = "w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-text-primary outline-none transition-shadow bg-card-bg";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -141,7 +157,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
         <div>
             <label htmlFor="status" className="block text-sm font-medium text-text-secondary mb-1">Status</label>
             <select id="status" value={status} onChange={(e) => setStatus(e.target.value as JobStatus)} className={commonInputClass}>
-            {JOB_STATUS_OPTIONS.map(option => (
+            {JOB_STATUS_OPTIONS.filter(opt => opt.value !== JobStatus.PAID).map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
             ))}
             </select>
@@ -149,14 +165,44 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       </div>
 
       <div>
-        <label htmlFor="cloudLink" className="block text-sm font-medium text-text-secondary mb-1">Link da Pasta na Nuvem (Opcional)</label>
-        <input type="url" id="cloudLink" value={cloudLink} onChange={(e) => setCloudLink(e.target.value)} className={commonInputClass} placeholder="https://example.com/drive/project" />
+        <label className="block text-sm font-medium text-text-secondary mb-1">Links da Nuvem (Opcional, até 3)</label>
+        {cloudLinks.map((link, index) => (
+          <div key={index} className="flex items-center space-x-2 mb-2">
+            <LinkIcon size={18} />
+            <input 
+              type="url" 
+              value={link} 
+              onChange={(e) => handleCloudLinkChange(index, e.target.value)} 
+              className={commonInputClass} 
+              placeholder={`Link ${index + 1}`}
+            />
+            {link && (
+                 <button type="button" onClick={() => removeCloudLink(index)} className="p-1 text-red-500 hover:text-red-700">
+                    <RemoveLinkIcon size={18} />
+                 </button>
+            )}
+          </div>
+        ))}
       </div>
       
       <div>
-        <label htmlFor="notes" className="block text-sm font-medium text-text-secondary mb-1">Notas (Opcional)</label>
+        <label htmlFor="notes" className="block text-sm font-medium text-text-secondary mb-1">Notas Gerais (Opcional)</label>
         <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={commonInputClass} placeholder="Detalhes adicionais sobre o job..."></textarea>
       </div>
+
+      <div className="flex items-center space-x-2 mt-2">
+        <input
+          type="checkbox"
+          id="createCalendarEvent"
+          checked={createCalendarEvent}
+          onChange={(e) => setCreateCalendarEvent(e.target.checked)}
+          className="h-4 w-4 text-accent border-border-color rounded focus:ring-accent"
+        />
+        <label htmlFor="createCalendarEvent" className="text-sm font-medium text-text-secondary flex items-center">
+            <CalendarIcon size={16} className="mr-1 text-accent" /> Criar evento no Google Calendar para o prazo
+        </label>
+      </div>
+
 
       <div className="flex justify-end pt-2">
         <button type="submit" className="bg-accent text-white px-6 py-2 rounded-lg shadow hover:brightness-90 transition-all">

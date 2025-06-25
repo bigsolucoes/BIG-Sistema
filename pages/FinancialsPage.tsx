@@ -1,22 +1,22 @@
+
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, FinancialStatus, JobStatus, Client } from '../types';
 import { CheckCircleIcon, ClockIcon, ExclamationCircleIcon, CurrencyDollarIcon } from '../constants';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
-import PaymentRegistrationModal from '../components/modals/PaymentRegistrationModal'; // New Modal
+import PaymentRegistrationModal from '../components/modals/PaymentRegistrationModal'; 
 import { formatCurrency, formatDate } from '../utils/formatters';
 
 const FinancialsPage: React.FC = () => {
-  const { jobs, clients, settings, loading } = useAppData(); // Removed updateJob, modal will handle it
+  const { jobs, clients, settings, loading } = useAppData(); 
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedJobForPayment, setSelectedJobForPayment] = useState<Job | undefined>(undefined);
 
   const getFinancialStatus = (job: Job): FinancialStatus => {
-    // A job is PAID if its status is PAID or if it has a paymentDate (primary) or paidAt (fallback)
-    if (job.status === JobStatus.PAID || job.paymentDate || job.paidAt) return FinancialStatus.PAID;
+    if (job.status === JobStatus.PAID) return FinancialStatus.PAID;
+    if (job.isPrePaid && job.prePaymentDate) return FinancialStatus.PAID; // Pre-paid jobs are considered paid here for listing
     
-    // An overdue job is one that is FINALIZED, past its deadline, and not paid.
     if (job.status === JobStatus.FINALIZED) {
         try {
             const today = new Date(); today.setHours(0,0,0,0);
@@ -25,13 +25,11 @@ const FinancialsPage: React.FC = () => {
         } catch(e) {/* ignore date parsing error, fallback to pending */}
         return FinancialStatus.PENDING;
     }
-    // Default for jobs that are Finalized but not yet paid (and not overdue)
-    // This case should ideally be covered above.
     return FinancialStatus.PENDING; 
   };
 
   const financialRecords = jobs
-    .filter(job => job.status === JobStatus.FINALIZED || job.status === JobStatus.PAID)
+    .filter(job => job.status === JobStatus.FINALIZED || job.status === JobStatus.PAID || job.isPrePaid) // Include pre-paid
     .map(job => {
       const client = clients.find(c => c.id === job.clientId);
       return {
@@ -44,7 +42,10 @@ const FinancialsPage: React.FC = () => {
         if (a.financialStatus !== FinancialStatus.PAID && b.financialStatus === FinancialStatus.PAID) return -1;
         if (a.financialStatus === FinancialStatus.PAID && b.financialStatus !== FinancialStatus.PAID) return 1;
         try {
-            return new Date(a.deadline).getTime() - new Date(b.deadline).getTime(); 
+            // Sort by payment date if available, otherwise deadline
+            const dateA = new Date(a.paymentDate || a.prePaymentDate || a.deadline).getTime();
+            const dateB = new Date(b.paymentDate || b.prePaymentDate || b.deadline).getTime();
+            return dateB - dateA; // Most recent first
         } catch (e) { return 0; }
     });
 
@@ -57,11 +58,14 @@ const FinancialsPage: React.FC = () => {
     setPaymentModalOpen(false);
     setSelectedJobForPayment(undefined);
     toast.success('Pagamento registrado com sucesso!');
-    // Data re-renders automatically due to context update in useAppData
   };
 
-  const StatusBadge: React.FC<{ status: FinancialStatus }> = ({ status }) => {
-    let bgColor, textColor, IconComponent;
+  const StatusBadge: React.FC<{ status: FinancialStatus; isPrePaid?: boolean }> = ({ status, isPrePaid }) => {
+    let bgColor, textColor, IconComponent, statusText = status;
+    if (isPrePaid && status === FinancialStatus.PAID) { // If it's paid *because* it was pre-paid
+        statusText = "Pré-Pago" as any; // Trick for display
+    }
+
     switch (status) {
       case FinancialStatus.PAID:
         bgColor = 'bg-green-100'; textColor = 'text-green-700'; IconComponent = CheckCircleIcon;
@@ -76,7 +80,7 @@ const FinancialsPage: React.FC = () => {
     }
     return (
       <span className={`px-3 py-1 inline-flex items-center text-xs font-semibold rounded-full ${bgColor} ${textColor}`}>
-        <IconComponent /> <span className="ml-1">{status}</span>
+        <IconComponent size={16} /> <span className="ml-1">{statusText}</span>
       </span>
     );
   };
@@ -118,10 +122,12 @@ const FinancialsPage: React.FC = () => {
                         {formatDate(record.deadline)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                        <StatusBadge status={record.financialStatus} />
+                        <StatusBadge status={record.financialStatus} isPrePaid={record.isPrePaid && record.status !== JobStatus.PAID} />
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                        {record.paymentDate ? formatDate(record.paymentDate, { dateStyle: 'short', timeStyle: 'short'}) : (record.paidAt ? formatDate(record.paidAt, { dateStyle: 'short', timeStyle: 'short'}) : '---')}
+                        {record.paymentDate ? formatDate(record.paymentDate, { dateStyle: 'short', timeStyle: 'short'}) 
+                         : (record.prePaymentDate ? `${formatDate(record.prePaymentDate, {dateStyle: 'short', timeStyle: 'short'})} (Antecip.)` 
+                         : (record.paidAt ? formatDate(record.paidAt, { dateStyle: 'short', timeStyle: 'short'}) : '---'))}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">{record.paymentMethod || '---'}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary truncate max-w-xs" title={record.paymentNotes}>{record.paymentNotes || '---'}</td>
@@ -131,13 +137,14 @@ const FinancialsPage: React.FC = () => {
                         ): '---'}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    {record.financialStatus !== FinancialStatus.PAID && (
+                    {/* Only show register payment if not fully paid (status is not PAID) and not pre-paid */}
+                    {record.status !== JobStatus.PAID && (
                         <button
                         onClick={() => handleOpenPaymentModal(record)}
                         className="text-accent hover:brightness-90 font-semibold transition-all flex items-center p-1 rounded hover:bg-green-50"
-                        title="Registrar Pagamento"
+                        title="Registrar Pagamento Final"
                         >
-                        <CurrencyDollarIcon /> <span className="ml-1">Registrar</span>
+                        <CurrencyDollarIcon size={18} /> <span className="ml-1">Registrar</span>
                         </button>
                     )}
                     </td>

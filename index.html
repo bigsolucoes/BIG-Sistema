@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,13 +24,13 @@
         }
         /* Define custom theme colors for Tailwind JIT */
         body {
-            --color-main-bg: #f4f4f5; /* zinc-100 (Light Gray) */
+            --color-main-bg: #FFFFFF; /* White */
             --color-card-bg: #ffffff; /* white */
-            --color-text-primary: #18181b; /* zinc-900 (Near Black) */
-            --color-text-secondary: #71717a; /* zinc-500 (Medium Gray) */
-            --color-accent: #A0522D; /* Brown (Sienna) */
-            --color-border-color: #d4d4d8; /* zinc-300 (Light Gray Border) */
-            --color-input-focus-border: #78350f; /* amber-800 (Darker Brown for focus) */
+            --color-text-primary: #1D1D1F; /* Dark Graphite */
+            --color-text-secondary: #71717a; /* zinc-500 (Medium Gray) - Kept as neutral secondary */
+            --color-accent: #007AFF; /* Vibrant Blue */
+            --color-border-color: #d4d4d8; /* zinc-300 (Light Gray Border) - Kept as neutral border */
+            --color-input-focus-border: #007AFF; /* Vibrant Blue for focus */
         }
         .bg-main-bg { background-color: var(--color-main-bg); }
         .bg-card-bg { background-color: var(--color-card-bg); }
@@ -42,10 +41,10 @@
         .border-border-color { border-color: var(--color-border-color); }
         .ring-accent { --tw-ring-color: var(--color-accent); }
         .hover\:text-accent:hover { color: var(--color-accent); }
-        .focus\:ring-custom-brown:focus { --tw-ring-color: var(--color-accent); }
-        .focus\:border-custom-brown:focus { border-color: var(--color-input-focus-border); }
+        .focus\:ring-custom-brown:focus { --tw-ring-color: var(--color-accent); } /* custom-brown will use the new accent */
+        .focus\:border-custom-brown:focus { border-color: var(--color-input-focus-border); } /* custom-brown border will use new focus border */
 
-        /* Specific classes for new palette */
+        /* Specific classes for new palette (custom-brown now maps to the new accent) */
         .bg-custom-brown { background-color: var(--color-accent); }
         .text-custom-brown { color: var(--color-accent); }
 
@@ -59,8 +58,8 @@
               'card-bg': 'var(--color-card-bg)',
               'text-primary': 'var(--color-text-primary)',
               'text-secondary': 'var(--color-text-secondary)',
-              'accent': 'var(--color-accent)', // Brown
-              'custom-brown': 'var(--color-accent)', // Explicitly 'custom-brown' for ACCENT_COLOR constant
+              'accent': 'var(--color-accent)', // New Blue
+              'custom-brown': 'var(--color-accent)', // Mapped to new blue, as ACCENT_COLOR constant uses "custom-brown"
               'border-color': 'var(--color-border-color)',
               'input-focus-border': 'var(--color-input-focus-border)',
             },
@@ -87,7 +86,8 @@
     "react-hot-toast": "https://esm.sh/react-hot-toast@^2.5.2",
     "uuid": "https://esm.sh/uuid@^11.1.0",
     "recharts": "https://esm.sh/recharts@^3.0.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.6.0"
+    "@google/genai": "https://esm.sh/@google/genai@^1.6.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.400.0"
   }
 }
 </script>

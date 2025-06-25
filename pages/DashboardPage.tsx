@@ -3,7 +3,7 @@ import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus }
 from '../types';
-import { PlusCircleIcon, CurrencyDollarIcon, ClockIcon, CheckCircleIcon, BriefcaseIcon, UsersIcon } from '../constants';
+import { PlusCircleIcon, WalletIcon, ClockIcon, CheckCircleIcon, BriefcaseIcon, UsersIcon } from '../constants'; // Changed CurrencyDollarIcon to WalletIcon
 import Modal from '../components/Modal';
 import JobForm from './forms/JobForm'; 
 import ClientForm from './forms/ClientForm'; 
@@ -27,32 +27,33 @@ const DashboardPage: React.FC = () => {
 
 
   const totalToReceive = jobs
-    .filter(job => job.status === JobStatus.FINALIZED && !job.paidAt)
+    .filter(job => job.status === JobStatus.FINALIZED && !job.paidAt && !job.isPrePaid) // Exclude pre-paid from "A Receber"
     .reduce((sum, job) => sum + job.value, 0);
 
   const receivedLast30Days = jobs
     .filter(job => {
         try {
-            // job.paidAt is used for general "is paid" check, paymentDate for actual date of payment
-            return (job.paidAt || job.paymentDate) && new Date(job.paymentDate || job.paidAt!) >= thirtyDaysAgo;
+            return (job.paidAt || job.paymentDate || job.prePaymentDate) && new Date(job.paymentDate || job.prePaymentDate || job.paidAt!) >= thirtyDaysAgo;
         } catch (e) { return false; }
     })
     .reduce((sum, job) => sum + job.value, 0);
 
   const jobStatusCounts = jobs.reduce((acc, job) => {
     try {
+        if (job.isDeleted || job.status === JobStatus.PAID) return acc; // Ignore deleted or fully paid jobs for this chart
+
         const deadlineDate = new Date(job.deadline);
-        const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < todayStart && job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED;
+        const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < todayStart && job.status !== JobStatus.FINALIZED;
         
         if (isOverdue) {
           acc.Atrasados = (acc.Atrasados || 0) + 1;
-        } else if (job.status === JobStatus.PAID || job.status === JobStatus.FINALIZED) {
-          acc.Concluídos = (acc.Concluídos || 0) + 1;
+        } else if (job.status === JobStatus.FINALIZED) { // Finalized but not yet paid (and not overdue)
+          acc.AguardandoPagamento = (acc.AguardandoPagamento || 0) + 1;
         } else if (job.status === JobStatus.REVIEW) {
           acc.AguardandoAprovação = (acc.AguardandoAprovação || 0) + 1;
         }
-         else {
-          acc.EmAndamento = (acc.EmAndamento || 0) + 1; // Includes BRIEFING, PRODUCTION
+         else { // BRIEFING, PRODUCTION
+          acc.EmAndamento = (acc.EmAndamento || 0) + 1;
         }
     } catch(e) {
         console.warn("Error processing job status for dashboard", job.id, e);
@@ -62,16 +63,16 @@ const DashboardPage: React.FC = () => {
 
   const jobStatusData = Object.entries(jobStatusCounts).map(([name, value]) => ({ name, value }));
   const COLORS = {
-    EmAndamento: '#3b82f6', 
+    EmAndamento: '#007AFF', 
     Atrasados: '#ef4444', 
     AguardandoAprovação: '#eab308', 
-    Concluídos: '#22c55e', 
+    AguardandoPagamento: '#f97316', // Orange for pending payment
   };
 
   const upcomingDeadlines = jobs
     .filter(job => {
         try {
-            return job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED && new Date(job.deadline) >= todayStart;
+            return job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED && !job.isDeleted && new Date(job.deadline) >= todayStart;
         } catch(e) { return false; }
     })
     .sort((a, b) => {
@@ -89,7 +90,6 @@ const DashboardPage: React.FC = () => {
       }
       
       const deadlineDayStart = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
-
 
       if (deadlineDayStart < todayStart) return 'Atrasado';
       if (deadlineDayStart.getTime() === todayStart.getTime()) return 'Hoje';
@@ -134,29 +134,27 @@ const DashboardPage: React.FC = () => {
             onClick={() => setJobModalOpen(true)}
             className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-all flex items-center"
           >
-            <PlusCircleIcon /> <span className="ml-2">Novo Job</span>
+            <PlusCircleIcon size={20} /> <span className="ml-2">Novo Job</span>
           </button>
           <button
             onClick={() => setClientModalOpen(true)}
             className="bg-slate-700 text-white px-4 py-2 rounded-lg shadow hover:bg-slate-600 transition-colors flex items-center"
           >
-            <PlusCircleIcon /> <span className="ml-2">Novo Cliente</span>
+            <PlusCircleIcon size={20} /> <span className="ml-2">Novo Cliente</span>
           </button>
         </div>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="A Receber" value={totalToReceive} icon={<CurrencyDollarIcon />} isCurrency={true} color="text-yellow-500" />
-        <StatCard title="Recebido (30 dias)" value={receivedLast30Days} icon={<CheckCircleIcon />} isCurrency={true} color="text-green-500" />
-        <StatCard title="Jobs Ativos" value={jobs.filter(j => j.status !== JobStatus.PAID && j.status !== JobStatus.FINALIZED).length} icon={<BriefcaseIcon />} color="text-blue-500" />
-        <StatCard title="Total Clientes" value={clients.length} icon={<UsersIcon />} color="text-indigo-500" />
+        <StatCard title="A Receber" value={totalToReceive} icon={<WalletIcon size={24} />} isCurrency={true} color="text-accent" />
+        <StatCard title="Recebido (30 dias)" value={receivedLast30Days} icon={<CheckCircleIcon size={24} />} isCurrency={true} color="text-green-500" />
+        <StatCard title="Jobs Ativos" value={jobs.filter(j => j.status !== JobStatus.PAID && !j.isDeleted).length} icon={<BriefcaseIcon size={24} />} color="text-accent" />
+        <StatCard title="Total Clientes" value={clients.length} icon={<UsersIcon size={24} />} color="text-accent" />
       </div>
       
-      {/* Job Status & Upcoming Deadlines */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-card-bg p-6 rounded-xl shadow-lg">
-          <h2 className="text-xl font-semibold mb-4 text-text-primary">Status dos Jobs</h2>
+          <h2 className="text-xl font-semibold mb-4 text-text-primary">Status dos Jobs Ativos</h2>
           {jobStatusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -169,7 +167,7 @@ const DashboardPage: React.FC = () => {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          ) : <p className="text-text-secondary">Nenhum job para exibir.</p>}
+          ) : <p className="text-text-secondary">Nenhum job ativo para exibir.</p>}
         </div>
 
         <div className="bg-card-bg p-6 rounded-xl shadow-lg">
@@ -178,7 +176,7 @@ const DashboardPage: React.FC = () => {
             <ul className="space-y-3">
               {upcomingDeadlines.map(job => (
                 <li key={job.id} className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <Link to={`/jobs`} className="block"> {/* Consider linking to job detail if available */}
+                  <Link to={`/jobs`} className="block"> 
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-text-primary">{job.name}</span>
                       <span className={`text-sm font-semibold ${new Date(job.deadline) < todayStart && job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED ? 'text-red-500' : 'text-accent'}`}>

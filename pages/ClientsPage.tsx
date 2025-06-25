@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { Client, Job } from '../types';
+import { Client, Job, JobStatus } from '../types'; // Added JobStatus
 import { PlusCircleIcon, PencilIcon, TrashIcon, CurrencyDollarIcon } from '../constants';
 import Modal from '../components/Modal';
 import ClientForm from './forms/ClientForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { formatCurrency, formatDate } from '../utils/formatters'; // Import formatters
+import { formatCurrency, formatDate } from '../utils/formatters'; 
 
 interface ClientCardProps {
   client: Client;
@@ -17,8 +17,8 @@ interface ClientCardProps {
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete, privacyModeEnabled }) => {
-  const clientJobs = jobs.filter(job => job.clientId === client.id);
-  const totalBilled = clientJobs.reduce((sum, job) => sum + job.value, 0);
+  const clientJobs = jobs.filter(job => job.clientId === client.id && !job.isDeleted); // Consider only non-deleted jobs
+  const totalBilled = clientJobs.filter(job => job.status === JobStatus.PAID || job.isPrePaid).reduce((sum, job) => sum + job.value, 0);
 
   return (
     <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col justify-between">
@@ -29,8 +29,8 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete,
             {client.company && <p className="text-sm text-text-secondary">{client.company}</p>}
           </div>
           <div className="flex space-x-2 flex-shrink-0">
-            <button onClick={() => onEdit(client)} className="text-slate-500 hover:text-accent p-1" title="Editar Cliente"><PencilIcon /></button>
-            <button onClick={() => onDelete(client.id)} className="text-slate-500 hover:text-red-500 p-1" title="Excluir Cliente"><TrashIcon /></button>
+            <button onClick={() => onEdit(client)} className="text-slate-500 hover:text-accent p-1" title="Editar Cliente"><PencilIcon size={18} /></button>
+            <button onClick={() => onDelete(client.id)} className="text-slate-500 hover:text-red-500 p-1" title="Excluir Cliente"><TrashIcon size={18} /></button>
           </div>
         </div>
         <div className="mt-4 space-y-2">
@@ -48,10 +48,10 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete,
       </div>
       <div className="mt-4 pt-4 border-t border-border-color">
         <div className="flex items-center text-text-primary">
-          <CurrencyDollarIcon />
-          <span className="ml-2">Total Faturado: {formatCurrency(totalBilled, privacyModeEnabled)}</span>
+          <CurrencyDollarIcon size={20} />
+          <span className="ml-2">Total Pago: {formatCurrency(totalBilled, privacyModeEnabled)}</span>
         </div>
-        <p className="text-sm text-text-secondary mt-1">{clientJobs.length} job(s) realizados.</p>
+        <p className="text-sm text-text-secondary mt-1">{clientJobs.length} job(s) realizados (não excluídos).</p>
       </div>
     </div>
   );
@@ -74,10 +74,10 @@ const ClientsPage: React.FC = () => {
   };
 
   const handleDeleteClient = (clientId: string) => {
-    const associatedJobsCount = jobs.filter(job => job.clientId === clientId).length;
+    const associatedJobsCount = jobs.filter(job => job.clientId === clientId && !job.isDeleted).length;
     let confirmMessage = 'Tem certeza que deseja excluir este cliente?';
     if (associatedJobsCount > 0) {
-      confirmMessage += `\nExistem ${associatedJobsCount} job(s) associados a este cliente. Eles não serão removidos, mas perderão a associação direta pelo nome do cliente nesta tela após a exclusão.`;
+      confirmMessage += `\nExistem ${associatedJobsCount} job(s) ativos ou finalizados associados a este cliente. Eles não serão removidos, mas perderão a associação direta pelo nome do cliente nesta tela após a exclusão. Jobs já pagos/arquivados não são contados aqui.`;
     }
 
     if (window.confirm(confirmMessage)) {
@@ -103,7 +103,7 @@ const ClientsPage: React.FC = () => {
           onClick={handleAddClient}
           className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-all flex items-center"
         >
-          <PlusCircleIcon /> <span className="ml-2">Adicionar Novo Cliente</span>
+          <PlusCircleIcon size={20} /> <span className="ml-2">Adicionar Novo Cliente</span>
         </button>
       </div>
 

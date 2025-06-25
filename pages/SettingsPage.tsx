@@ -1,8 +1,8 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import toast from 'react-hot-toast';
-import { APP_NAME } from '../constants';
-import LoadingSpinner from '../components/LoadingSpinner'; // Import LoadingSpinner
+import { APP_NAME, SettingsIcon as PageIcon, CalendarIcon, LinkIcon } from '../constants'; // PageIcon, CalendarIcon, LinkIcon
+import LoadingSpinner from '../components/LoadingSpinner'; 
 
 const SettingsPage: React.FC = () => {
   const { settings, updateSettings, loading } = useAppData();
@@ -11,8 +11,8 @@ const SettingsPage: React.FC = () => {
   const [asaasUrlInput, setAsaasUrlInput] = useState(settings.asaasUrl || '');
   const [googleDriveUrlInput, setGoogleDriveUrlInput] = useState(settings.googleDriveUrl || '');
   const [userNameInput, setUserNameInput] = useState(settings.userName || '');
-  const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#f4f4f5');
-  const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#A0522D');
+  const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#FFFFFF');
+  const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#007AFF');
   const [splashBgColorInput, setSplashBgColorInput] = useState(settings.splashScreenBackgroundColor || '#111827');
 
   useEffect(() => {
@@ -21,8 +21,8 @@ const SettingsPage: React.FC = () => {
       setAsaasUrlInput(settings.asaasUrl || 'https://www.asaas.com/login');
       setGoogleDriveUrlInput(settings.googleDriveUrl || 'https://drive.google.com');
       setUserNameInput(settings.userName || '');
-      setPrimaryColorInput(settings.primaryColor || '#f4f4f5');
-      setAccentColorInput(settings.accentColor || '#A0522D');
+      setPrimaryColorInput(settings.primaryColor || '#FFFFFF');
+      setAccentColorInput(settings.accentColor || '#007AFF');
       setSplashBgColorInput(settings.splashScreenBackgroundColor || '#111827');
     }
   }, [settings, loading]);
@@ -30,7 +30,7 @@ const SettingsPage: React.FC = () => {
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // Max 2MB
+      if (file.size > 2 * 1024 * 1024) { 
         toast.error('O arquivo do logotipo é muito grande. Máximo 2MB.');
         return;
       }
@@ -45,6 +45,26 @@ const SettingsPage: React.FC = () => {
   const handleRemoveLogo = () => {
     setCustomLogoPreview(undefined);
   }
+
+  const handleConnectGoogleCalendar = () => {
+    console.log("Attempting to connect to Google Calendar via Settings...");
+    toast('Simulando conexão com Google Calendar...', { icon: '🗓️' });
+    setTimeout(() => {
+        const success = Math.random() > 0.3; 
+        if (success) {
+            updateSettings({ googleCalendarConnected: true });
+            toast.success('Google Calendar conectado (simulado)!');
+        } else {
+            updateSettings({ googleCalendarConnected: false });
+            toast.error('Falha ao conectar com Google Calendar (simulado).');
+        }
+    }, 1500);
+  };
+
+  const handleDisconnectGoogleCalendar = () => {
+    updateSettings({ googleCalendarConnected: false });
+    toast('Google Calendar desconectado.', { icon: 'ℹ️' });
+  };
 
   const handleSaveChanges = () => {
     try {
@@ -69,6 +89,7 @@ const SettingsPage: React.FC = () => {
       primaryColor: primaryColorInput,
       accentColor: accentColorInput,
       splashScreenBackgroundColor: splashBgColorInput,
+      // googleCalendarConnected is updated by its own handlers
     });
     toast.success('Configurações salvas com sucesso!');
   };
@@ -83,7 +104,7 @@ const SettingsPage: React.FC = () => {
     return url.protocol === "http:" || url.protocol === "https:";
   }
   
-  const commonInputClass = "w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-custom-brown focus:border-custom-brown text-text-primary outline-none transition-shadow bg-card-bg";
+  const commonInputClass = "w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-text-primary outline-none transition-shadow bg-card-bg";
   const sectionCardClass = "bg-card-bg p-6 rounded-xl shadow-lg";
   const colorInputClass = "p-1 h-10 w-full border border-border-color rounded-md cursor-pointer";
 
@@ -92,9 +113,11 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-text-primary">Configurações</h1>
-
-      {/* User Data Section */}
+      <div className="flex items-center">
+        <PageIcon size={32} className="text-accent mr-3" />
+        <h1 className="text-3xl font-bold text-text-primary">Configurações</h1>
+      </div>
+      
       <div className={sectionCardClass}>
         <h2 className="text-xl font-semibold text-text-primary mb-4">Dados do Usuário</h2>
         <div>
@@ -110,11 +133,8 @@ const SettingsPage: React.FC = () => {
           </div>
       </div>
       
-      {/* Appearance Section */}
       <div className={sectionCardClass}>
         <h2 className="text-xl font-semibold text-text-primary mb-4">Personalização da Aparência</h2>
-        
-        {/* Logo Upload */}
         <div className="mb-6">
             <h3 className="text-lg font-medium text-text-primary mb-2">Logotipo da Aplicação</h3>
             <div className="flex items-center space-x-4">
@@ -149,7 +169,6 @@ const SettingsPage: React.FC = () => {
             </div>
         </div>
 
-        {/* Color Pickers */}
         <div className="mb-6">
             <h3 className="text-lg font-medium text-text-primary mb-2">Cores do Sistema</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -169,9 +188,8 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-
       <div className={sectionCardClass}>
-        <h2 className="text-xl font-semibold text-text-primary mb-4">URLs Externas (Iframes)</h2>
+        <h2 className="text-xl font-semibold text-text-primary mb-4 flex items-center"><LinkIcon size={22} className="mr-2 text-accent"/>URLs Externas (Iframes)</h2>
         <div className="space-y-4">
           <div>
             <label htmlFor="asaasUrl" className="block text-sm font-medium text-text-secondary mb-1">URL da Página de Pagamentos (Asaas)</label>
@@ -197,6 +215,34 @@ const SettingsPage: React.FC = () => {
             />
             <p className="text-xs text-text-secondary mt-1">Deixe em branco para usar a URL padrão.</p>
           </div>
+        </div>
+      </div>
+
+      <div className={sectionCardClass}>
+        <h2 className="text-xl font-semibold text-text-primary mb-4 flex items-center"><CalendarIcon size={22} className="mr-2 text-accent"/>Integrações</h2>
+        <div>
+            <h3 className="text-lg font-medium text-text-primary mb-2">Google Calendar</h3>
+            {settings.googleCalendarConnected ? (
+                <div className="flex items-center gap-4">
+                    <p className="text-green-600 font-medium">Conectado ao Google Calendar.</p>
+                    <button 
+                        onClick={handleDisconnectGoogleCalendar}
+                        className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition-colors text-sm"
+                    >
+                        Desconectar
+                    </button>
+                </div>
+            ) : (
+                <button 
+                    onClick={handleConnectGoogleCalendar}
+                    className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-colors text-sm flex items-center"
+                >
+                   <CalendarIcon size={18} className="mr-2"/> Conectar com Google Calendar
+                </button>
+            )}
+             <p className="text-xs text-text-secondary mt-2">
+                Permite criar eventos no seu Google Calendar para prazos de jobs.
+            </p>
         </div>
       </div>
       

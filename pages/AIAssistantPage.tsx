@@ -7,6 +7,7 @@ import { SparklesIcon } from '../constants';
 import { callGeminiApi } from '../services/geminiService';
 import { v4 as uuidv4 } from 'uuid';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SendHorizonal } from 'lucide-react'; // Using SendHorizonal for send button
 
 const AIAssistantPage: React.FC = () => {
   const { jobs, clients, loading: appDataLoading } = useAppData();
@@ -22,7 +23,6 @@ const AIAssistantPage: React.FC = () => {
   useEffect(scrollToBottom, [messages]);
   
   useEffect(() => {
-    // Initial greeting from AI
     if(messages.length === 0){
         setMessages([
             {
@@ -33,8 +33,7 @@ const AIAssistantPage: React.FC = () => {
             }
         ]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [messages.length]); // Added messages.length to dependency array
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -51,11 +50,9 @@ const AIAssistantPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepare context for the AI
       const contextData = {
         jobs,
         clients,
-        // Potentially add more data like financial summaries or performance KPIs
       };
       
       const aiResponse = await callGeminiApi(input, contextData);
@@ -105,8 +102,6 @@ const AIAssistantPage: React.FC = () => {
 
   const handleExampleQuestionClick = (question: string) => {
     setInput(question);
-    // Optionally, auto-submit:
-    // handleSendMessage(); // but need to wrap in a way that doesn't require event
   };
 
 
@@ -118,7 +113,7 @@ const AIAssistantPage: React.FC = () => {
     <div className="flex flex-col h-full bg-card-bg shadow-xl rounded-xl overflow-hidden">
       <header className="p-4 border-b border-border-color bg-slate-50">
         <h1 className="text-xl font-semibold text-text-primary flex items-center">
-          <SparklesIcon /> <span className="ml-2">Assistente AI</span>
+          <SparklesIcon size={22} /> <span className="ml-2">Assistente AI</span>
         </h1>
       </header>
 
@@ -157,9 +152,7 @@ const AIAssistantPage: React.FC = () => {
             className="bg-accent text-white p-3 rounded-lg shadow hover:bg-opacity-90 transition-colors disabled:opacity-50"
             disabled={isLoading || !input.trim()}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            <SendHorizonal size={24} />
           </button>
         </form>
       </div>

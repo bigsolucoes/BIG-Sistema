@@ -1,14 +1,17 @@
+
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../hooks/useAppData';
-import { APP_NAME, CogIcon, EyeOpenIcon, EyeClosedIcon } from '../constants';
+import { useAuth } from '../hooks/useAuth'; 
+import { APP_NAME, SettingsIcon, EyeOpenIcon, EyeClosedIcon } from '../constants'; // Updated CogIcon to SettingsIcon
 
 const Header: React.FC = () => {
   const { settings, updateSettings } = useAppData();
+  const { logout } = useAuth(); 
   const navigate = useNavigate();
 
   const handleLogoClick = () => {
-    navigate('/dashboard');
+    logout(); 
   };
 
   const togglePrivacyMode = () => {
@@ -16,12 +19,12 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-card-bg text-text-primary p-4 shadow-md flex justify-between items-center h-16">
+    <header className="bg-card-bg text-text-primary p-4 shadow-md flex justify-between items-center h-16 sticky top-0 z-30"> {/* Added sticky and z-index */}
       {/* Logo on the left */}
       <div 
         onClick={handleLogoClick}
         className="cursor-pointer flex items-center"
-        title="Ir para o Dashboard"
+        title="Sair do Sistema"
       >
         {settings.customLogo ? (
           <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-8 max-h-full max-w-xs object-contain" />
@@ -37,14 +40,14 @@ const Header: React.FC = () => {
           className="p-2 text-text-secondary hover:text-accent transition-colors"
           title={settings.privacyModeEnabled ? "Mostrar Valores Monetários" : "Ocultar Valores Monetários"}
         >
-          {settings.privacyModeEnabled ? <EyeClosedIcon /> : <EyeOpenIcon />}
+          {settings.privacyModeEnabled ? <EyeClosedIcon size={20} /> : <EyeOpenIcon size={20} />}
         </button>
         <Link 
           to="/settings" 
           className="p-2 text-text-secondary hover:text-accent transition-colors"
           title="Configurações"
         >
-          <CogIcon />
+          <SettingsIcon size={20} /> {/* Using SettingsIcon from lucide */}
         </Link>
       </div>
     </header>

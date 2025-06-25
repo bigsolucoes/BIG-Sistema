@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, Client, ServiceType, JobStatus } from '../types';
@@ -36,57 +37,72 @@ const PerformancePage: React.FC = () => {
     return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
   }
   const privacyMode = settings.privacyModeEnabled || false;
+  const accentColor = settings.accentColor || '#007AFF'; 
+  const activeJobs = jobs.filter(job => !job.isDeleted); // Use non-deleted jobs for performance metrics
 
   // Faturamento Mensal (últimos 12 meses)
-  const monthlyRevenueMap = jobs
-    .filter(job => job.paymentDate || job.paidAt) // Consider both for flexibility
+  const monthlyRevenueMap = activeJobs
+    .filter(job => job.paymentDate || job.paidAt) 
     .reduce((acc, job) => {
       try {
         const date = new Date(job.paymentDate || job.paidAt!);
         if (isNaN(date.getTime())) return acc; 
-
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
-        const yearMonthKey = `${year}-${month}`; 
-        
+        const yearMonthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
         acc[yearMonthKey] = (acc[yearMonthKey] || 0) + job.value;
-      } catch (e) {
-        console.warn("Error processing job.paidAt/paymentDate for revenue", job.id, e);
-      }
+      } catch (e) { console.warn("Error processing revenue date", job.id, e); }
       return acc;
     }, {} as { [key: string]: number });
 
   const revenueData = Object.entries(monthlyRevenueMap)
     .map(([yearMonthKey, revenue]) => {
       const [yearStr, monthStr] = yearMonthKey.split('-');
-      const dateForFormatting = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
-      const displayName = dateForFormatting.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-      return { key: yearMonthKey, name: displayName, Receita: revenue };
+      const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+      return { key: yearMonthKey, name: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }), Receita: revenue };
     })
-    .sort((a, b) => a.key.localeCompare(b.key)) 
-    .slice(-12);
+    .sort((a, b) => a.key.localeCompare(b.key)).slice(-12);
+
+  // Projetos Concluídos (Pagos) por Mês
+  const monthlyCompletedJobsMap = activeJobs
+    .filter(job => job.paymentDate || job.paidAt) // Consider jobs as "completed" for this chart once paid
+    .reduce((acc, job) => {
+        try {
+            const date = new Date(job.paymentDate || job.paidAt!);
+            if (isNaN(date.getTime())) return acc;
+            const yearMonthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            acc[yearMonthKey] = (acc[yearMonthKey] || 0) + 1;
+        } catch(e) { console.warn("Error processing completed job date", job.id, e); }
+        return acc;
+    }, {} as {[key: string]: number});
+  
+  const completedJobsData = Object.entries(monthlyCompletedJobsMap)
+    .map(([yearMonthKey, count]) => {
+        const [yearStr, monthStr] = yearMonthKey.split('-');
+        const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+        return { key: yearMonthKey, name: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }), Quantidade: count };
+    })
+    .sort((a,b) => a.key.localeCompare(b.key)).slice(-12);
 
 
   // Top Clientes por Receita
   const clientRevenue = clients.map(client => {
-    const total = jobs
+    const total = activeJobs
       .filter(job => job.clientId === client.id && (job.paymentDate || job.paidAt))
       .reduce((sum, job) => sum + job.value, 0);
     return { name: client.name, value: total };
   }).filter(c => c.value > 0).sort((a,b) => b.value - a.value).slice(0,5); 
 
-  // Top Serviços por Receita
+  // Receita por Categoria de Serviço
   const serviceRevenue = Object.values(ServiceType).map(service => {
-    const total = jobs
+    const total = activeJobs
       .filter(job => job.serviceType === service && (job.paymentDate || job.paidAt))
       .reduce((sum, job) => sum + job.value, 0);
     return { name: service, value: total };
-  }).filter(s => s.value > 0);
+  }).filter(s => s.value > 0).sort((a,b) => b.value - a.value); // Sort for better viz
   
-  const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const PIE_COLORS = [accentColor, '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#A0522D', '#D2691E', '#8A2BE2'].filter((c, i, arr) => arr.indexOf(c) === i);
 
-  // Valor Médio por Job
-  const paidJobsList = jobs.filter(job => job.paymentDate || job.paidAt);
+  // Valor Médio por Job (Pago)
+  const paidJobsList = activeJobs.filter(job => job.paymentDate || job.paidAt);
   const averageJobValue = paidJobsList.length > 0 ? paidJobsList.reduce((sum, job) => sum + job.value, 0) / paidJobsList.length : 0;
 
   // Tempo Médio de Conclusão (do createdAt até paymentDate/paidAt para jobs pagos)
@@ -96,32 +112,27 @@ const PerformancePage: React.FC = () => {
         try {
           const start = new Date(job.createdAt!).getTime();
           const end = new Date(job.paymentDate || job.paidAt!).getTime();
-          if (isNaN(start) || isNaN(end)) return sum; 
+          if (isNaN(start) || isNaN(end) || end < start) return sum; 
           return sum + (end - start);
         } catch (e) {
           console.warn("Error calculating completion time for job", job.id, e);
           return sum;
         }
-      }, 0) / completedJobsWithTimes.length / (1000 * 60 * 60 * 24) // in days
+      }, 0) / completedJobsWithTimes.length / (1000 * 60 * 60 * 24) 
     : 0;
 
-
-  const currencyTooltipFormatter = (value: number) => {
-    return [formatCurrency(value, privacyMode), "Receita"];
-  }
-  const currencyAxisTickFormatter = (value: number) => {
-      if (privacyMode) return 'R$•••';
-      return `R$${value/1000}k`;
-  }
-
+  const currencyTooltipFormatter = (value: number) => [formatCurrency(value, privacyMode), "Receita"];
+  const countTooltipFormatter = (value: number) => [value.toString(), "Quantidade"];
+  const currencyAxisTickFormatter = (value: number) => privacyMode ? 'R$•••' : `R$${value/1000}k`;
+  const countAxisTickFormatter = (value: number) => value.toString();
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Painel de Desempenho</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <KPICard title="Valor Médio por Job" value={averageJobValue} isCurrency={true} privacyModeEnabled={privacyMode} unit="R$" />
-        <KPICard title="Tempo Médio de Conclusão" value={averageCompletionTime.toFixed(1)} unit="dias" />
+        <KPICard title="Valor Médio por Projeto (Pago)" value={averageJobValue} isCurrency={true} privacyModeEnabled={privacyMode} unit="R$" />
+        <KPICard title="Tempo Médio de Pagamento" value={averageCompletionTime.toFixed(1)} unit="dias" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -134,10 +145,25 @@ const PerformancePage: React.FC = () => {
                 <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
-                <Bar dataKey="Receita" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receita" fill={accentColor} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes para o gráfico de faturamento.</p>}
+          ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
+        </ChartCard>
+
+        <ChartCard title="Projetos Concluídos (Pagos) por Mês">
+          {completedJobsData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={completedJobsData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis tickFormatter={countAxisTickFormatter} allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <Tooltip formatter={countTooltipFormatter} />
+                <Legend wrapperStyle={{fontSize: "14px"}} />
+                <Bar dataKey="Quantidade" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
         </ChartCard>
 
         <ChartCard title="Top 5 Clientes (por Receita)">
@@ -161,22 +187,26 @@ const PerformancePage: React.FC = () => {
                 <Legend wrapperStyle={{fontSize: "14px"}}/>
               </PieChart>
             </ResponsiveContainer>
-           ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes para o gráfico de top clientes.</p>}
+           ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
         </ChartCard>
 
         <ChartCard title="Receita por Tipo de Serviço">
           {serviceRevenue.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={serviceRevenue} layout="vertical">
+               <BarChart data={serviceRevenue} layout="vertical" margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis type="number" tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" width={80} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#64748b', fontSize: 11 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}}/>
-                <Bar dataKey="value" fill="#22c55e" radius={[0, 4, 4, 0]} barSize={25}/>
+                <Bar dataKey="value" fill={accentColor} radius={[0, 4, 4, 0]} barSize={20}>
+                    {serviceRevenue.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
-          ): <p className="text-text-secondary text-center pt-10">Dados insuficientes para o gráfico de top serviços.</p>}
+          ): <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
         </ChartCard>
       </div>
     </div>
