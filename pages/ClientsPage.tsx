@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { Client, Job, JobStatus } from '../types'; // Added JobStatus
+import { Client, Job } from '../types';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
 import { PlusCircleIcon, PencilIcon, TrashIcon, CurrencyDollarIcon } from '../constants';
 import Modal from '../components/Modal';
 import ClientForm from './forms/ClientForm';
@@ -17,8 +19,8 @@ interface ClientCardProps {
 }
 
 const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete, privacyModeEnabled }) => {
-  const clientJobs = jobs.filter(job => job.clientId === client.id && !job.isDeleted); // Consider only non-deleted jobs
-  const totalBilled = clientJobs.filter(job => job.status === JobStatus.PAID || job.isPrePaid).reduce((sum, job) => sum + job.value, 0);
+  const clientJobs = jobs.filter(job => job.clientId === client.id && !job.isDeleted);
+  const totalPaidByClient = clientJobs.reduce((sum, job) => sum + getJobPaymentSummary(job).totalPaid, 0);
 
   return (
     <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col justify-between">
@@ -49,7 +51,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete,
       <div className="mt-4 pt-4 border-t border-border-color">
         <div className="flex items-center text-text-primary">
           <CurrencyDollarIcon size={20} />
-          <span className="ml-2">Total Pago: {formatCurrency(totalBilled, privacyModeEnabled)}</span>
+          <span className="ml-2">Total Pago: {formatCurrency(totalPaidByClient, privacyModeEnabled)}</span>
         </div>
         <p className="text-sm text-text-secondary mt-1">{clientJobs.length} job(s) realizados (não excluídos).</p>
       </div>
@@ -77,7 +79,7 @@ const ClientsPage: React.FC = () => {
     const associatedJobsCount = jobs.filter(job => job.clientId === clientId && !job.isDeleted).length;
     let confirmMessage = 'Tem certeza que deseja excluir este cliente?';
     if (associatedJobsCount > 0) {
-      confirmMessage += `\nExistem ${associatedJobsCount} job(s) ativos ou finalizados associados a este cliente. Eles não serão removidos, mas perderão a associação direta pelo nome do cliente nesta tela após a exclusão. Jobs já pagos/arquivados não são contados aqui.`;
+      confirmMessage += `\nExistem ${associatedJobsCount} job(s) associados a este cliente. Eles não serão removidos, mas perderão a associação direta pelo nome do cliente.`;
     }
 
     if (window.confirm(confirmMessage)) {

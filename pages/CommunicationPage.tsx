@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { CheckCircleIcon } from '../constants';
 
 const WHATSAPP_WARNING_KEY = 'big_whatsapp_warning_shown';
 
@@ -20,7 +21,14 @@ const CommunicationPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <h1 className="text-3xl font-bold text-text-primary mb-4">Comunicação (WhatsApp Web)</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-text-primary">Comunicação (WhatsApp Web)</h1>
+        <div className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+          <CheckCircleIcon size={16} className="mr-1.5"/>
+          Conexão Ativa
+        </div>
+      </div>
+
 
       {showWarning && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md shadow" role="alert">

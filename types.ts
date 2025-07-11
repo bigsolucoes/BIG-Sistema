@@ -36,45 +36,46 @@ export interface JobObservation {
   timestamp: string;
 }
 
+export interface Payment {
+  id: string;
+  amount: number;
+  date: string; // ISO String
+  method?: string;
+  notes?: string;
+}
+
 export interface Job {
   id: string;
   name: string;
   clientId: string;
   serviceType: ServiceType;
   value: number;
+  cost?: number; // New for profitability tracking
   deadline: string; // ISO string date
   status: JobStatus;
   cloudLinks?: string[]; 
   createdAt: string;
-  paidAt?: string; // ISO string date - Specifically for when payment was made
   notes?: string; // General job notes
-
-  // New fields for detailed payment registration
-  paymentDate?: string; // The actual date payment was registered/received
-  paymentMethod?: string;
-  paymentAttachmentName?: string; // Filename of the attachment
-  paymentAttachmentData?: string; // Optional: base64 data if storing file content
-  paymentNotes?: string; // Notes specific to the payment
-
-  // New fields for Lixeira and Observations
   isDeleted?: boolean;
   observationsLog?: JobObservation[];
-
-  // New fields for v2.5
-  isPrePaid?: boolean;
-  prePaymentDate?: string; // ISO string date for advance payment
+  payments: Payment[]; // Replaces all old payment fields
   createCalendarEvent?: boolean; // For Google Calendar integration
 }
 
-export enum FinancialStatus {
-  PENDING = 'Aguardando Pagamento',
+export enum FinancialJobStatus {
+  PENDING_DEPOSIT = 'Aguardando Entrada',
+  PARTIALLY_PAID = 'Parcialmente Pago',
+  PENDING_FULL_PAYMENT = 'Aguardando Pagamento',
   PAID = 'Pago',
   OVERDUE = 'Atrasado',
 }
 
+
 export interface FinancialRecord extends Job {
-  financialStatus: FinancialStatus;
+  financialStatus: FinancialJobStatus;
   clientName?: string;
+  totalPaid: number;
+  remaining: number;
 }
 
 export interface AIChatMessage {
@@ -99,13 +100,12 @@ export interface GroundingChunk {
 export interface AppSettings {
   customLogo?: string; // base64 string
   asaasUrl?: string;
-  // googleDriveUrl?: string; // Removed
   userName?: string; // This is for display name in dashboard, not auth username
   primaryColor?: string;
   accentColor?: string;
   splashScreenBackgroundColor?: string;
-  privacyModeEnabled?: boolean; // New: For obfuscating monetary values
-  googleCalendarConnected?: boolean; // For GCal integration status
+  privacyModeEnabled?: boolean; 
+  googleCalendarConnected?: boolean;
 }
 
 export interface User {
@@ -113,12 +113,26 @@ export interface User {
   username: string; 
 }
 
+export interface ScriptLine {
+  id: string;
+  scene: string;
+  description: string;
+  duration: number; // in seconds
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  dataUrl: string; // base64
+}
+
 export interface DraftNote {
   id: string;
   title: string;
-  content: string;
+  type: 'TEXT' | 'SCRIPT';
+  content: string; 
+  scriptLines: ScriptLine[];
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
-  imageBase64?: string; // For storing the low-quality image
-  imageMimeType?: string; // To correctly display the image
 }

@@ -1,125 +1,181 @@
 
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { DraftNote } from '../types';
-import { PlusCircleIcon, BotIcon, TrashIcon, PencilIcon, SaveIcon, XIcon, DraftIcon, ImageUpIcon, ImageOffIcon } from '../constants';
+import { DraftNote, ScriptLine, Attachment } from '../types';
+import { PlusCircleIcon, TrashIcon, SaveIcon, DraftIcon, PlusIcon, MinusIcon, ClockIcon, PaperclipIcon, XIcon, ImageUpIcon } from '../constants';
 import toast from 'react-hot-toast';
 import { formatDate } from '../utils/formatters';
-import Modal from '../components/Modal'; // Assuming Modal component exists
 import LoadingSpinner from '../components/LoadingSpinner';
-// import { callGeminiApi } from '../services/geminiService'; // Uncomment when AI integration is ready
+import { v4 as uuidv4 } from 'uuid';
+import Modal from '../components/Modal';
 
 const DraftsPage: React.FC = () => {
   const { draftNotes, addDraftNote, updateDraftNote, deleteDraftNote, loading: appLoading } = useAppData();
-  const [selectedDraft, setSelectedDraft] = useState<DraftNote | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
-  const [editImageBase64, setEditImageBase64] = useState<string | undefined>(undefined);
-  const [editImageMimeType, setEditImageMimeType] = useState<string | undefined>(undefined);
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newDraftData, setNewDraftData] = useState({ title: '', type: 'SCRIPT' as 'TEXT' | 'SCRIPT' });
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+
+  // Editor state
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftContent, setDraftContent] = useState('');
+  const [scriptLines, setScriptLines] = useState<ScriptLine[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  
+  const selectedDraft = useMemo(() => {
+    return draftNotes.find(d => d.id === selectedDraftId) || null;
+  }, [selectedDraftId, draftNotes]);
 
   useEffect(() => {
-    if (selectedDraft && isEditing) {
-      setEditTitle(selectedDraft.title);
-      setEditContent(selectedDraft.content);
-      setEditImageBase64(selectedDraft.imageBase64);
-      setEditImageMimeType(selectedDraft.imageMimeType);
-    } else if (!selectedDraft) {
-      setIsEditing(false); // Reset editing state if no draft is selected
-      setEditImageBase64(undefined);
-      setEditImageMimeType(undefined);
+    if (selectedDraft) {
+      setDraftTitle(selectedDraft.title);
+      setDraftContent(selectedDraft.content || '');
+      setScriptLines(selectedDraft.scriptLines || []);
+      setAttachments(selectedDraft.attachments || []);
+    } else {
+      setDraftTitle('');
+      setDraftContent('');
+      setScriptLines([]);
+      setAttachments([]);
     }
-  }, [selectedDraft, isEditing]);
+  }, [selectedDraft]);
 
-  const handleCreateNewDraft = () => {
-    const newDraft = addDraftNote({ title: 'Novo Rascunho', content: '' });
-    setSelectedDraft(newDraft);
-    setIsEditing(true);
-    setEditImageBase64(undefined);
-    setEditImageMimeType(undefined);
-  };
+  const isDirty = () => {
+    if (!selectedDraft) return false;
+    const originalTitle = selectedDraft.title;
+    const originalContent = selectedDraft.content;
+    const originalLines = JSON.stringify(selectedDraft.scriptLines);
+    const originalAttachments = JSON.stringify(selectedDraft.attachments);
 
+    const currentTitle = draftTitle;
+    const currentContent = draftContent;
+    const currentLines = JSON.stringify(scriptLines);
+    const currentAttachments = JSON.stringify(attachments);
+
+    return originalTitle !== currentTitle || originalContent !== currentContent || originalLines !== currentLines || originalAttachments !== currentAttachments;
+  }
+  
   const handleSelectDraft = (draft: DraftNote) => {
-    if (isEditing && selectedDraft && selectedDraft.id !== draft.id) {
-      if (window.confirm("Você tem alterações não salvas no rascunho atual. Deseja descartá-las e abrir outro rascunho?")) {
-        setIsEditing(false); 
-        setSelectedDraft(draft);
-        setEditImageBase64(draft.imageBase64);
-        setEditImageMimeType(draft.imageMimeType);
+     if (isDirty()) {
+      if (window.confirm("Você tem alterações não salvas. Deseja descartá-las?")) {
+        setSelectedDraftId(draft.id);
       }
     } else {
-        setSelectedDraft(draft);
-        setIsEditing(false); 
-        setEditImageBase64(draft.imageBase64);
-        setEditImageMimeType(draft.imageMimeType);
+      setSelectedDraftId(draft.id);
     }
   };
 
-  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 1 * 1024 * 1024) { // 1MB limit for "low quality"
-        toast.error('Imagem muito grande. Máximo 1MB.');
-        return;
-      }
-      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
-        toast.error('Formato de imagem inválido. Use JPEG, PNG, GIF ou WebP.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditImageBase64(reader.result as string);
-        setEditImageMimeType(file.type);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const handleOpenCreateModal = () => {
+    setNewDraftData({ title: '', type: 'SCRIPT'});
+    setIsCreateModalOpen(true);
+  }
 
-  const handleRemoveImage = () => {
-    setEditImageBase64(undefined);
-    setEditImageMimeType(undefined);
-  };
+  const handleConfirmCreateDraft = () => {
+    if (!newDraftData.title.trim()) {
+        toast.error("O título é obrigatório.");
+        return;
+    }
+    const newDraft = addDraftNote({ title: newDraftData.title, type: newDraftData.type });
+    setSelectedDraftId(newDraft.id);
+    setIsCreateModalOpen(false);
+  }
 
   const handleSaveChanges = () => {
     if (!selectedDraft) return;
-    if (!editTitle.trim()) {
+    if (!draftTitle.trim()) {
       toast.error('O título não pode ficar vazio.');
       return;
     }
     const updatedDraftData: DraftNote = { 
       ...selectedDraft, 
-      title: editTitle, 
-      content: editContent,
-      imageBase64: editImageBase64,
-      imageMimeType: editImageMimeType,
+      title: draftTitle, 
+      content: draftContent,
+      scriptLines: scriptLines,
+      attachments: attachments,
     };
     updateDraftNote(updatedDraftData);
-    setSelectedDraft(prev => prev ? {...updatedDraftData, updatedAt: new Date().toISOString()} : null);
-    setIsEditing(false);
     toast.success('Rascunho salvo!');
   };
 
   const handleDeleteDraft = (draftId: string) => {
     if (window.confirm('Tem certeza que deseja excluir este rascunho?')) {
       deleteDraftNote(draftId);
-      if (selectedDraft?.id === draftId) {
-        setSelectedDraft(null);
-        setIsEditing(false);
+      if (selectedDraftId === draftId) {
+        setSelectedDraftId(null);
       }
       toast.success('Rascunho excluído.');
     }
   };
-
-  const handleInvokeAI = async () => {
-    if (!selectedDraft || !isEditing) return;
-    setIsAiLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
-    const placeholderText = "\n\n[Texto gerado pela IA placeholder... Lorem ipsum dolor sit amet.]";
-    setEditContent(prev => prev + placeholderText);
-    toast.success("Assistente AI adicionou texto (placeholder).");
-    setIsAiLoading(false);
+  
+  const updateLine = (index: number, field: keyof Omit<ScriptLine, 'id'>, value: string | number) => {
+    const newLines = [...scriptLines];
+    const line = newLines[index];
+    if (field === 'duration') {
+        const numValue = Number(value);
+        line[field] = isNaN(numValue) || numValue < 0 ? 0 : numValue;
+    } else {
+        line[field] = value as string;
+    }
+    setScriptLines(newLines);
   };
+
+  const addLine = (index: number) => {
+    const newLines = [...scriptLines];
+    const prevLine = newLines[index];
+    const newSceneNumber = parseInt(prevLine.scene, 10);
+    const newScene = !isNaN(newSceneNumber) ? (newSceneNumber + 1).toString() : '';
+
+    newLines.splice(index + 1, 0, { id: uuidv4(), scene: newScene, description: '', duration: prevLine.duration });
+    setScriptLines(newLines);
+  };
+
+  const removeLine = (index: number) => {
+    if (scriptLines.length <= 1) {
+        toast.error("O roteiro deve ter pelo menos uma cena.");
+        return;
+    }
+    const newLines = scriptLines.filter((_, i) => i !== index);
+    setScriptLines(newLines);
+  };
+
+  const handleAttachmentUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('O arquivo é muito grande. Máximo 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newAttachment: Attachment = {
+          id: uuidv4(),
+          name: file.name,
+          dataUrl: reader.result as string,
+        };
+        setAttachments(prev => [...prev, newAttachment]);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset file input
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
+
+  const removeAttachment = (attachmentId: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== attachmentId));
+  };
+
+  const totalDuration = useMemo(() => {
+    return scriptLines.reduce((acc, line) => acc + (line.duration || 0), 0);
+  }, [scriptLines]);
+
+  const formatTotalDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  }
 
 
   if (appLoading) {
@@ -135,7 +191,7 @@ const DraftsPage: React.FC = () => {
             <DraftIcon size={22} className="mr-2 text-accent"/> Meus Rascunhos
           </h2>
           <button
-            onClick={handleCreateNewDraft}
+            onClick={handleOpenCreateModal}
             className="p-2 text-accent hover:bg-slate-100 rounded-full"
             title="Criar Novo Rascunho"
           >
@@ -149,11 +205,11 @@ const DraftsPage: React.FC = () => {
               key={draft.id}
               onClick={() => handleSelectDraft(draft)}
               className={`p-3 rounded-lg cursor-pointer transition-colors
-                          ${selectedDraft?.id === draft.id ? 'bg-accent text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200'}`}
+                          ${selectedDraftId === draft.id ? 'bg-accent text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200'}`}
             >
-              <h3 className={`font-medium truncate ${selectedDraft?.id === draft.id ? 'text-white' : 'text-text-primary'}`}>{draft.title}</h3>
-              <p className={`text-xs truncate ${selectedDraft?.id === draft.id ? 'text-blue-100' : 'text-text-secondary'}`}>
-                Modificado: {formatDate(draft.updatedAt, {dateStyle: 'short', timeStyle: 'short'})}
+              <h3 className={`font-medium truncate ${selectedDraftId === draft.id ? 'text-white' : 'text-text-primary'}`}>{draft.title}</h3>
+              <p className={`text-xs truncate ${selectedDraftId === draft.id ? 'text-blue-100' : 'text-text-secondary'}`}>
+                {draft.type === 'SCRIPT' ? 'Roteiro' : 'Texto'} • Modificado: {formatDate(draft.updatedAt, {dateStyle: 'short', timeStyle: 'short'})}
               </p>
             </div>
           ))}
@@ -161,40 +217,26 @@ const DraftsPage: React.FC = () => {
       </div>
 
       {/* Main Editor Area */}
-      <div className="flex-grow bg-card-bg shadow-lg rounded-xl p-6 flex flex-col">
+      <div className="flex-grow bg-card-bg shadow-lg rounded-xl flex flex-col">
         {selectedDraft ? (
           <>
-            <div className="flex justify-between items-center mb-4 pb-4 border-b border-border-color">
-              {isEditing ? (
-                <input
+            <div className="flex justify-between items-center p-4 border-b border-border-color">
+              <input
                   type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="text-2xl font-semibold text-text-primary bg-transparent border border-border-color rounded-md px-2 py-1 flex-grow mr-4 focus:ring-1 focus:ring-accent outline-none"
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  className="text-2xl font-semibold text-text-primary bg-transparent border-b-2 border-transparent focus:border-accent w-full mr-4 outline-none transition-colors"
                   placeholder="Título do Rascunho"
                 />
-              ) : (
-                <h1 className="text-2xl font-semibold text-text-primary truncate">{selectedDraft.title}</h1>
-              )}
               <div className="flex items-center space-x-2">
-                {!isEditing ? (
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="p-2 text-slate-600 hover:text-accent hover:bg-slate-100 rounded-full"
-                        title="Editar Rascunho"
-                    >
-                        <PencilIcon size={20} />
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleSaveChanges}
-                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded-full"
-                        title="Salvar Alterações"
-                        disabled={isAiLoading}
-                    >
-                        <SaveIcon size={20} />
-                    </button>
-                )}
+                 <button
+                    onClick={handleSaveChanges}
+                    disabled={!isDirty()}
+                    className="p-2 text-green-600 hover:text-green-700 enabled:hover:bg-green-100 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Salvar Alterações"
+                >
+                    <SaveIcon size={20} />
+                </button>
                  <button
                     onClick={() => handleDeleteDraft(selectedDraft.id)}
                     className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full"
@@ -202,88 +244,92 @@ const DraftsPage: React.FC = () => {
                  >
                     <TrashIcon size={20} />
                  </button>
-                {isEditing && (
+              </div>
+            </div>
+            
+            <div className="overflow-y-auto flex-grow p-4">
+                {selectedDraft.type === 'SCRIPT' ? (
+                     <table className="w-full border-collapse">
+                        <thead className="sticky top-0 bg-slate-50 z-10">
+                            <tr>
+                                <th className="p-2 border-b border-border-color text-left text-sm font-medium text-text-secondary w-24">CENA</th>
+                                <th className="p-2 border-b border-border-color text-left text-sm font-medium text-text-secondary">DESCRIÇÃO</th>
+                                <th className="p-2 border-b border-border-color text-left text-sm font-medium text-text-secondary w-28">DURAÇÃO (s)</th>
+                                <th className="p-2 border-b border-border-color text-left text-sm font-medium text-text-secondary w-24">AÇÕES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {scriptLines.map((line, index) => (
+                                <tr key={line.id} className="group hover:bg-slate-50">
+                                    <td className="p-1 border-b border-border-color"><input type="text" value={line.scene} onChange={(e) => updateLine(index, 'scene', e.target.value)} className="w-full bg-transparent p-1 rounded focus:bg-white focus:ring-1 focus:ring-accent outline-none text-text-primary"/></td>
+                                    <td className="p-1 border-b border-border-color"><textarea value={line.description} onChange={(e) => updateLine(index, 'description', e.target.value)} className="w-full bg-transparent p-1 rounded focus:bg-white focus:ring-1 focus:ring-accent outline-none resize-y min-h-[40px] text-sm text-text-primary" rows={1}/></td>
+                                    <td className="p-1 border-b border-border-color"><input type="number" value={line.duration} onChange={(e) => updateLine(index, 'duration', e.target.value)} className="w-full bg-transparent p-1 rounded focus:bg-white focus:ring-1 focus:ring-accent outline-none text-text-primary"/></td>
+                                    <td className="p-1 border-b border-border-color text-center">
+                                        <div className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => addLine(index)} className="p-1 text-green-500 hover:bg-green-100 rounded-full" title="Adicionar Cena Abaixo"><PlusIcon size={18}/></button>
+                                            <button onClick={() => removeLine(index)} className="p-1 text-red-500 hover:bg-red-100 rounded-full" title="Remover Cena"><MinusIcon size={18}/></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <textarea 
+                        value={draftContent}
+                        onChange={(e) => setDraftContent(e.target.value)}
+                        className="w-full h-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-text-primary bg-card-bg outline-none text-sm resize-none"
+                        placeholder="Escreva sua anotação aqui..."
+                    />
+                )}
+            </div>
+
+            {/* Attachments Section */}
+            <div className="p-4 border-t border-border-color">
+                <h3 className="text-base font-semibold text-text-primary mb-2 flex items-center"><PaperclipIcon size={18} className="mr-2"/>Anexos</h3>
+                <div className="flex flex-wrap gap-4 items-center">
+                    {attachments.map(att => (
+                        <div key={att.id} className="relative group w-24 h-24">
+                            <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover rounded-md border border-border-color"/>
+                            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => removeAttachment(att.id)} className="p-2 bg-red-500 text-white rounded-full" title="Remover Anexo">
+                                    <TrashIcon size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                     <button
-                        onClick={() => { setIsEditing(false); setEditTitle(selectedDraft.title); setEditContent(selectedDraft.content); setEditImageBase64(selectedDraft.imageBase64); setEditImageMimeType(selectedDraft.imageMimeType);}}
-                        className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full"
-                        title="Cancelar Edição"
+                        onClick={() => attachmentInputRef.current?.click()}
+                        className="w-24 h-24 border-2 border-dashed border-border-color rounded-md flex flex-col items-center justify-center text-text-secondary hover:bg-slate-50 hover:border-accent hover:text-accent transition-colors"
+                        title="Adicionar Anexo"
                     >
-                        <XIcon size={20} />
+                        <ImageUpIcon size={24}/>
+                        <span className="text-xs mt-1">Adicionar</span>
                     </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="text-xs text-text-secondary mb-3">
-              Criado: {formatDate(selectedDraft.createdAt, {dateStyle: 'medium', timeStyle: 'short'})} | 
-              Última Modificação: {formatDate(selectedDraft.updatedAt, {dateStyle: 'medium', timeStyle: 'short'})}
+                    <input type="file" ref={attachmentInputRef} onChange={handleAttachmentUpload} accept="image/*" className="hidden" />
+                </div>
             </div>
 
-            {/* Image Display/Upload Section */}
-            {isEditing ? (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-text-secondary mb-1">Imagem (Opcional, máx 1MB)</label>
-                {editImageBase64 && editImageMimeType && (
-                  <div className="mb-2 relative group">
-                    <img src={editImageBase64} alt="Preview do Rascunho" className="max-h-48 w-auto border border-border-color rounded" />
-                    <button 
-                      onClick={handleRemoveImage} 
-                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Remover Imagem"
-                    >
-                      <ImageOffIcon size={16} />
-                    </button>
-                  </div>
+            <div className="p-4 border-t border-border-color bg-slate-50 flex justify-between items-center">
+                <p className="text-sm text-text-secondary">
+                    Criado: {formatDate(selectedDraft.createdAt, {dateStyle: 'short'})} | 
+                    Atualizado: {formatDate(selectedDraft.updatedAt, {dateStyle: 'short', timeStyle: 'short'})}
+                </p>
+                {selectedDraft.type === 'SCRIPT' && (
+                    <div className="flex items-center font-semibold bg-accent text-white px-3 py-1.5 rounded-lg">
+                        <ClockIcon size={16} className="mr-2"/>
+                        <span>TEMPO TOTAL: {formatTotalDuration(totalDuration)}</span>
+                    </div>
                 )}
-                <div className="flex items-center">
-                    <label htmlFor="imageUpload" className="cursor-pointer bg-slate-200 hover:bg-slate-300 text-text-secondary px-3 py-2 rounded-md text-sm flex items-center transition-colors">
-                        <ImageUpIcon size={18} className="mr-2"/> {editImageBase64 ? 'Alterar Imagem' : 'Adicionar Imagem'}
-                    </label>
-                    <input type="file" id="imageUpload" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageUpload} className="hidden" />
-                </div>
-              </div>
-            ) : (
-              selectedDraft.imageBase64 && selectedDraft.imageMimeType && (
-                <div className="mb-4">
-                  <img src={selectedDraft.imageBase64} alt="Imagem do Rascunho" className="max-h-60 w-auto border border-border-color rounded" />
-                </div>
-              )
-            )}
-
-            {isEditing ? (
-              <textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                className="flex-grow w-full p-3 border border-border-color rounded-md focus:ring-1 focus:ring-accent outline-none resize-none text-text-primary bg-white text-sm"
-                placeholder="Comece a escrever seu rascunho..."
-                disabled={isAiLoading}
-              />
-            ) : (
-              <div className="flex-grow w-full p-3 border border-border-color rounded-md overflow-y-auto whitespace-pre-wrap text-text-primary bg-slate-50 text-sm">
-                {selectedDraft.content || <span className="text-text-secondary">Este rascunho está vazio.</span>}
-              </div>
-            )}
-            
-            {isEditing && (
-              <div className="mt-4 pt-4 border-t border-border-color flex justify-end">
-                <button
-                  onClick={handleInvokeAI}
-                  disabled={isAiLoading}
-                  className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-all flex items-center disabled:opacity-50"
-                >
-                  {isAiLoading ? <LoadingSpinner size="sm" color="text-white border-white" /> : <BotIcon size={18} className="mr-2" />}
-                  {isAiLoading ? 'Gerando...' : 'Assistente AI'}
-                </button>
-              </div>
-            )}
+            </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
             <DraftIcon size={64} className="text-slate-300 mb-4" />
             <p className="text-xl text-text-secondary">Selecione um rascunho para visualizar ou editar.</p>
-            <p className="mt-2 text-text-secondary">Ou crie um novo rascunho para começar.</p>
+            <p className="mt-2 text-text-secondary">Ou crie um novo para começar.</p>
             <button
-                onClick={handleCreateNewDraft}
+                onClick={handleOpenCreateModal}
                 className="mt-6 bg-accent text-white px-6 py-3 rounded-lg shadow hover:brightness-90 transition-all flex items-center text-lg"
             >
                 <PlusCircleIcon size={22} className="mr-2"/> Criar Novo Rascunho
@@ -291,6 +337,48 @@ const DraftsPage: React.FC = () => {
           </div>
         )}
       </div>
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Criar Novo Rascunho">
+        <div className="space-y-4">
+            <div>
+                <label htmlFor="draftTitle" className="block text-sm font-medium text-text-secondary mb-1">Título</label>
+                <input
+                    type="text"
+                    id="draftTitle"
+                    value={newDraftData.title}
+                    onChange={(e) => setNewDraftData(prev => ({ ...prev, title: e.target.value}))}
+                    className="w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-text-primary outline-none transition-shadow bg-card-bg"
+                    placeholder="Título do seu rascunho..."
+                />
+            </div>
+            <div>
+                 <label className="block text-sm font-medium text-text-secondary mb-1">Tipo de Rascunho</label>
+                 <div className="flex space-x-2">
+                     <button
+                        onClick={() => setNewDraftData(prev => ({...prev, type: 'SCRIPT'}))}
+                        className={`flex-1 p-3 border rounded-md text-left ${newDraftData.type === 'SCRIPT' ? 'border-accent ring-2 ring-accent' : 'border-border-color'}`}
+                     >
+                        <h4 className="font-semibold text-text-primary">Roteiro</h4>
+                        <p className="text-xs text-text-secondary">Estrutura com cenas, descrições e duração.</p>
+                     </button>
+                     <button
+                        onClick={() => setNewDraftData(prev => ({...prev, type: 'TEXT'}))}
+                        className={`flex-1 p-3 border rounded-md text-left ${newDraftData.type === 'TEXT' ? 'border-accent ring-2 ring-accent' : 'border-border-color'}`}
+                    >
+                        <h4 className="font-semibold text-text-primary">Texto Simples</h4>
+                        <p className="text-xs text-text-secondary">Uma nota de texto livre para ideias e anotações.</p>
+                     </button>
+                 </div>
+            </div>
+            <div className="flex justify-end pt-2">
+                <button
+                    onClick={handleConfirmCreateDraft}
+                    className="bg-accent text-white px-6 py-2 rounded-lg shadow hover:brightness-90 transition-all"
+                >
+                    Criar Rascunho
+                </button>
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 };

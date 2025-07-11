@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Job, Client, JobStatus, JobObservation } from '../types';
+import { Job, Client, JobStatus, JobObservation, Payment } from '../types';
 import { useAppData } from '../hooks/useAppData';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { 
-    XIcon, PencilIcon, TrashIcon, PlusIcon, CloudLinkIcon, CurrencyDollarIcon, CheckIcon 
+    XIcon, PencilIcon, TrashIcon, PlusIcon, CloudLinkIcon, CurrencyDollarIcon, CheckIcon, ArchiveIcon
 } from '../constants';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,7 +18,8 @@ interface JobDetailsPanelProps {
   onEdit: (job: Job) => void;
   onDelete: (jobId: string) => void; 
   onRegisterPayment: (job: Job) => void;
-  onRegisterPrePayment: (job: Job) => void; // New prop for success callback
+  onOpenArchive: () => void;
+  onOpenTrash: () => void;
 }
 
 const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
@@ -27,21 +30,28 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
   onEdit,
   onDelete,
   onRegisterPayment,
-  onRegisterPrePayment,
+  onOpenArchive,
+  onOpenTrash,
 }) => {
   const { settings, updateJob } = useAppData();
   const [newObservation, setNewObservation] = useState('');
   const panelRef = useRef<HTMLDivElement>(null);
+  
+  const { totalPaid, remaining, isFullyPaid } = getJobPaymentSummary(job);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Panel closes on backdrop click via parent div
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
     };
+
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
 
@@ -61,23 +71,6 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
     setNewObservation('');
     toast.success('Observação adicionada!');
   };
-
-  const handleRegisterPrePayment = () => {
-    if (job.isPrePaid) {
-        toast.error("Este job já foi marcado como pré-pago.");
-        return;
-    }
-    if (window.confirm("Confirmar registro de pagamento antecipado para este job?")) {
-        const updatedJobData: Job = {
-            ...job,
-            isPrePaid: true,
-            prePaymentDate: new Date().toISOString(),
-        };
-        updateJob(updatedJobData);
-        onRegisterPrePayment(updatedJobData); // Call success callback
-    }
-  };
-
 
   if (!isOpen) return null;
 
@@ -125,14 +118,38 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
         <div className="flex-grow p-6 overflow-y-auto space-y-6">
           <section>
             <h3 className="text-sm font-medium text-text-secondary mb-1">Status</h3>
-            <div className="flex items-center gap-2">
-                <p className={`text-sm font-semibold px-2 py-1 inline-block rounded-full ${getStatusColor(job.status)}`}>{job.status}</p>
-                {job.isPrePaid && (
-                    <span className="flex items-center text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold" title={`Pré-pago em: ${formatDate(job.prePaymentDate)}`}>
-                        <CurrencyDollarIcon size={14} className="mr-1"/> Pré-Pago
-                    </span>
-                )}
+            <p className={`text-sm font-semibold px-2 py-1 inline-block rounded-full ${getStatusColor(job.status)}`}>{job.status}</p>
+          </section>
+
+          <section className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <h3 className="text-lg font-semibold text-text-primary mb-3">Resumo Financeiro</h3>
+            <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                    <p className="text-xs text-text-secondary font-medium">VALOR TOTAL</p>
+                    <p className="font-bold text-text-primary text-lg">{formatCurrency(job.value, settings.privacyModeEnabled)}</p>
+                </div>
+                 <div>
+                    <p className="text-xs text-text-secondary font-medium">TOTAL PAGO</p>
+                    <p className="font-bold text-green-600 text-lg">{formatCurrency(totalPaid, settings.privacyModeEnabled)}</p>
+                </div>
+                 <div>
+                    <p className="text-xs text-text-secondary font-medium">SALDO RESTANTE</p>
+                    <p className="font-bold text-red-600 text-lg">{formatCurrency(remaining, settings.privacyModeEnabled)}</p>
+                </div>
             </div>
+            {job.payments.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-200">
+                     <h4 className="text-sm font-medium text-text-secondary mb-2">Histórico de Pagamentos</h4>
+                     <ul className="space-y-1 text-sm">
+                        {job.payments.map(p => (
+                            <li key={p.id} className="flex justify-between items-center bg-white p-2 rounded">
+                                <span>{formatDate(p.date, {dateStyle: 'short'})}: {p.notes || p.method || 'Pagamento'}</span>
+                                <span className="font-semibold">{formatCurrency(p.amount, settings.privacyModeEnabled)}</span>
+                            </li>
+                        ))}
+                     </ul>
+                </div>
+            )}
           </section>
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -146,10 +163,6 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
                 <p className="text-text-primary">{job.serviceType}</p>
             </section>
             <section>
-                <h3 className="text-sm font-medium text-text-secondary mb-1">Valor</h3>
-                <p className="text-text-primary font-semibold">{formatCurrency(job.value, settings.privacyModeEnabled)}</p>
-            </section>
-            <section>
                 <h3 className="text-sm font-medium text-text-secondary mb-1">Prazo</h3>
                 <p className="text-text-primary">{formatDate(job.deadline)}</p>
             </section>
@@ -157,12 +170,6 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
                 <h3 className="text-sm font-medium text-text-secondary mb-1">Criado em</h3>
                 <p className="text-text-primary text-xs">{formatDate(job.createdAt, {dateStyle: 'medium', timeStyle: 'short'})}</p>
             </section>
-            {job.prePaymentDate && (
-                 <section>
-                    <h3 className="text-sm font-medium text-text-secondary mb-1">Data Pré-Pagamento</h3>
-                    <p className="text-text-primary text-xs">{formatDate(job.prePaymentDate, {dateStyle: 'medium', timeStyle: 'short'})}</p>
-                </section>
-            )}
           </div>
           
           {(job.cloudLinks && job.cloudLinks.length > 0) && (
@@ -196,7 +203,7 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
           
           <section>
             <h3 className="text-lg font-semibold text-text-primary mb-3">Observações / Atualizações</h3>
-            <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
               {job.observationsLog && job.observationsLog.length > 0 ? (
                 [...job.observationsLog].reverse().map(obs => ( 
                   <div key={obs.id} className="bg-slate-100 p-3 rounded-md shadow-sm">
@@ -229,36 +236,50 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
           </section>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-border-color sticky bottom-0 bg-card-bg z-10 flex flex-wrap gap-2 justify-end">
-          {job.status !== JobStatus.PAID && !job.isPrePaid && (
-             <button
-                onClick={handleRegisterPrePayment}
-                className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
-            >
-               <CheckIcon size={18} className="mr-1"/> <span className="ml-1">Pagamento Antecipado</span>
-            </button>
-          )}
-          {job.status !== JobStatus.PAID && (
-            <button
-                onClick={() => onRegisterPayment(job)}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
-            >
-               <CurrencyDollarIcon size={18} /> <span className="ml-1">Registrar Pagamento Final</span>
-            </button>
-          )}
-          <button
-            onClick={() => onEdit(job)}
-            className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
-          >
-            <PencilIcon size={18} /> <span className="ml-1">Editar Job</span>
-          </button>
-          <button
-            onClick={() => onDelete(job.id)}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
-          >
-           <TrashIcon size={18} /> <span className="ml-1">Mover para Lixeira</span>
-          </button>
+        {/* Footer */}
+        <div className="p-4 border-t border-border-color sticky bottom-0 bg-card-bg z-10">
+            {/* Job Actions */}
+            <div className="flex flex-wrap gap-2 justify-end">
+                {job.status !== JobStatus.PAID && (
+                    <button
+                        onClick={() => onRegisterPayment(job)}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
+                    >
+                    <CurrencyDollarIcon size={18} /> <span className="ml-1">Registrar Pagamento</span>
+                    </button>
+                )}
+                <button
+                    onClick={() => onEdit(job)}
+                    className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
+                >
+                    <PencilIcon size={18} /> <span className="ml-1">Editar Job</span>
+                </button>
+                <button
+                    onClick={() => onDelete(job.id)}
+                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
+                >
+                <TrashIcon size={18} /> <span className="ml-1">Mover para Lixeira</span>
+                </button>
+            </div>
+            {/* Global Navigation */}
+            <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-start gap-4">
+                 <button
+                    onClick={onOpenArchive}
+                    className="text-slate-600 hover:text-accent transition-colors flex items-center gap-2 text-sm font-medium p-2 rounded-lg hover:bg-slate-100"
+                    title="Ver todos os jobs arquivados"
+                >
+                    <ArchiveIcon size={18} />
+                    <span>Ver Arquivo</span>
+                </button>
+                <button
+                    onClick={onOpenTrash}
+                    className="text-slate-600 hover:text-accent transition-colors flex items-center gap-2 text-sm font-medium p-2 rounded-lg hover:bg-slate-100"
+                    title="Ver jobs na lixeira"
+                >
+                    <TrashIcon size={18} />
+                    <span>Ver Lixeira</span>
+                </button>
+            </div>
         </div>
       </div>
     </div>

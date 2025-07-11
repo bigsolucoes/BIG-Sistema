@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Job, Client, ServiceType, JobStatus, AppSettings, JobObservation, DraftNote } from '../types';
+import { Job, Client, ServiceType, JobStatus, AppSettings, JobObservation, DraftNote, Payment, ScriptLine, Attachment } from '../types';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
 
 // Default theme colors
@@ -14,7 +14,7 @@ interface AppDataContextType {
   clients: Client[];
   draftNotes: DraftNote[];
   settings: AppSettings;
-  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'paidAt' | 'paymentDate' | 'paymentMethod' | 'paymentAttachmentName' | 'paymentNotes' | 'isDeleted' | 'observationsLog' | 'cloudLinks' | 'isPrePaid' | 'prePaymentDate' | 'createCalendarEvent'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent'>>) => void;
+  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost'>>) => void;
   updateJob: (job: Job) => void;
   deleteJob: (jobId: string) => void; // Soft delete
   permanentlyDeleteJob: (jobId: string) => void; // Hard delete
@@ -24,7 +24,7 @@ interface AppDataContextType {
   deleteClient: (clientId: string) => void;
   getClientById: (clientId: string) => Client | undefined;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
-  addDraftNote: (draft: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt' | 'imageBase64' | 'imageMimeType'>) => DraftNote;
+  addDraftNote: (draft: { title: string, type: 'TEXT' | 'SCRIPT' }) => DraftNote;
   updateDraftNote: (draft: DraftNote) => void;
   deleteDraftNote: (draftId: string) => void;
   loading: boolean;
@@ -32,11 +32,7 @@ interface AppDataContextType {
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
-const initialJobs: Job[] = [
-    { id: uuidv4(), name: 'Vídeo Promocional TechCorp', clientId: 'client1', serviceType: ServiceType.VIDEO, value: 2500, deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.PRODUCTION, cloudLinks: ['https://example.com/drive/techcorp_video'], createdAt: new Date().toISOString(), notes: 'Focus on new product features.', isDeleted: false, observationsLog: [], isPrePaid: false, createCalendarEvent: true },
-    { id: uuidv4(), name: 'Sessão Fotográfica "Urban Style"', clientId: 'client2', serviceType: ServiceType.PHOTO, value: 800, deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.BRIEFING, createdAt: new Date().toISOString(), isDeleted: false, observationsLog: [], cloudLinks: [], isPrePaid: true, prePaymentDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), createCalendarEvent: false },
-    { id: uuidv4(), name: 'Redesign Logotipo "NatureFoods"', clientId: 'client3', serviceType: ServiceType.DESIGN, value: 1200, deadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), status: JobStatus.REVIEW, createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), notes: 'Client wants a modern, minimalist look.', isDeleted: false, observationsLog: [], cloudLinks: [], isPrePaid: false },
-];
+const initialJobs: Job[] = []; // Start with no jobs, loaded from localStorage
 
 const initialClients: Client[] = [
     { id: 'client1', name: 'Ana Silva', company: 'TechCorp Solutions', email: 'ana.silva@techcorp.com', phone: '11987654321', createdAt: new Date().toISOString(), cpf: '111.222.333-44', observations: 'Prefere comunicação por email.' },
@@ -45,14 +41,12 @@ const initialClients: Client[] = [
 ];
 
 const initialDraftNotes: DraftNote[] = [
-    {id: uuidv4(), title: "Ideias Brainstorm", content: "Primeira ideia para o projeto X...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), imageBase64: undefined, imageMimeType: undefined},
-    {id: uuidv4(), title: "Roteiro Vídeo Y", content: "Cena 1: Abertura...", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), imageBase64: undefined, imageMimeType: undefined},
+    {id: uuidv4(), title: "Exemplo de Roteiro", type: 'SCRIPT', content: "", scriptLines: [{id: uuidv4(), scene: "1", description: "CENA DE ABERTURA: Um dia ensolarado no parque.", duration: 15}], attachments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()},
 ];
 
 const initialSettings: AppSettings = {
   customLogo: undefined,
   asaasUrl: 'https://www.asaas.com/login',
-  // googleDriveUrl: 'https://drive.google.com', // Removed
   userName: '',
   primaryColor: DEFAULT_PRIMARY_COLOR,
   accentColor: DEFAULT_ACCENT_COLOR,
@@ -76,6 +70,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     document.documentElement.style.setProperty('--color-input-focus-border', currentAccentColor);
   }, [settings.primaryColor, settings.accentColor]);
 
+  // Data Loading and Migration Effect
   useEffect(() => {
     try {
       const storedJobs = localStorage.getItem('big_jobs');
@@ -83,24 +78,67 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const storedDrafts = localStorage.getItem('big_draftNotes');
       const storedSettings = localStorage.getItem('big_settings');
 
-      const parsedJobs = storedJobs ? JSON.parse(storedJobs) : initialJobs;
-      setJobs(parsedJobs.map((job: any) => ({
-        ...job,
-        isDeleted: job.isDeleted === undefined ? false : job.isDeleted,
-        observationsLog: job.observationsLog || [],
-        cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []),
-        isPrePaid: job.isPrePaid === undefined ? false : job.isPrePaid,
-        prePaymentDate: job.prePaymentDate,
-        createCalendarEvent: job.createCalendarEvent === undefined ? false : job.createCalendarEvent,
-      })));
+      // Migrate Jobs
+      let parsedJobs = storedJobs ? JSON.parse(storedJobs) : initialJobs;
+      const migratedJobs = parsedJobs.map((job: any): Job => {
+        // Migration from old payment system to new `payments` array
+        if (!job.payments) {
+          job.payments = [];
+          if (job.isPrePaid && job.prePaymentDate) {
+              job.payments.push({
+                  id: uuidv4(),
+                  amount: job.value,
+                  date: job.prePaymentDate,
+                  notes: 'Pagamento antecipado (migrado)',
+                  method: 'N/A'
+              });
+          } else if (job.paidAt || job.paymentDate) {
+              job.payments.push({
+                  id: uuidv4(),
+                  amount: job.value,
+                  date: job.paymentDate || job.paidAt,
+                  notes: job.paymentNotes || 'Pagamento final (migrado)',
+                  method: job.paymentMethod || 'N/A'
+              });
+          }
+        }
+        // Clean up old fields
+        delete job.paidAt;
+        delete job.paymentDate;
+        delete job.paymentMethod;
+        delete job.paymentAttachmentName;
+        delete job.paymentAttachmentData;
+        delete job.paymentNotes;
+        delete job.isPrePaid;
+        delete job.prePaymentDate;
+        
+        return {
+          ...job,
+          id: job.id || uuidv4(),
+          isDeleted: job.isDeleted ?? false,
+          observationsLog: job.observationsLog || [],
+          cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []),
+          createCalendarEvent: job.createCalendarEvent ?? false,
+          cost: job.cost ?? undefined,
+          payments: job.payments || [],
+        };
+      });
+      setJobs(migratedJobs);
+
 
       setClients(storedClients ? JSON.parse(storedClients) : initialClients);
       
+      // Migrate Drafts to new format
       const parsedDrafts = storedDrafts ? JSON.parse(storedDrafts) : initialDraftNotes;
-      setDraftNotes(parsedDrafts.map((draft: any) => ({
+      setDraftNotes(parsedDrafts.map((draft: any): DraftNote => ({
         ...draft,
-        imageBase64: draft.imageBase64 || undefined,
-        imageMimeType: draft.imageMimeType || undefined,
+        type: draft.type || 'SCRIPT', // Default existing drafts to SCRIPT
+        scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []),
+        content: draft.content || '',
+        attachments: draft.attachments || [], // Add empty attachments array
+        // Clear old image fields just in case
+        imageBase64: undefined, 
+        imageMimeType: undefined,
       })));
       
       const loadedSettings = storedSettings ? JSON.parse(storedSettings) : initialSettings;
@@ -110,29 +148,17 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         splashScreenBackgroundColor: loadedSettings.splashScreenBackgroundColor || DEFAULT_SPLASH_BACKGROUND_COLOR,
         customLogo: loadedSettings.customLogo,
         asaasUrl: loadedSettings.asaasUrl || 'https://www.asaas.com/login',
-        // googleDriveUrl: loadedSettings.googleDriveUrl || 'https://drive.google.com', // Removed
         userName: loadedSettings.userName || '',
-        privacyModeEnabled: loadedSettings.privacyModeEnabled === undefined ? false : loadedSettings.privacyModeEnabled,
-        googleCalendarConnected: loadedSettings.googleCalendarConnected === undefined ? false : loadedSettings.googleCalendarConnected,
+        privacyModeEnabled: loadedSettings.privacyModeEnabled ?? false,
+        googleCalendarConnected: loadedSettings.googleCalendarConnected ?? false,
       });
 
     } catch (error) {
-      console.error("Failed to load data from localStorage", error);
-      setJobs(initialJobs.map(job => ({
-        ...job,
-        isDeleted: job.isDeleted === undefined ? false : job.isDeleted,
-        observationsLog: job.observationsLog || [],
-        cloudLinks: job.cloudLinks || [],
-        isPrePaid: job.isPrePaid === undefined ? false : job.isPrePaid,
-        prePaymentDate: job.prePaymentDate,
-        createCalendarEvent: job.createCalendarEvent === undefined ? false : job.createCalendarEvent,
-      })));
+      console.error("Failed to load or migrate data from localStorage", error);
+      // Set to empty or default if error
+      setJobs([]);
       setClients(initialClients);
-      setDraftNotes(initialDraftNotes.map(draft => ({
-        ...draft,
-        imageBase64: draft.imageBase64 || undefined,
-        imageMimeType: draft.imageMimeType || undefined,
-      })));
+      setDraftNotes(initialDraftNotes);
       setSettings(initialSettings);
     } finally {
       setLoading(false);
@@ -163,16 +189,15 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [settings, loading]);
 
-  const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'paidAt' | 'paymentDate' | 'paymentMethod' | 'paymentAttachmentName' | 'paymentNotes' | 'isDeleted' | 'observationsLog' | 'cloudLinks' | 'isPrePaid' | 'prePaymentDate' | 'createCalendarEvent'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent'>>) => {
+ const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost'>>) => {
     const newJob: Job = {
         ...jobData,
         id: uuidv4(),
         createdAt: new Date().toISOString(),
         isDeleted: false,
         observationsLog: [],
+        payments: [],
         cloudLinks: jobData.cloudLinks || [],
-        isPrePaid: false,
-        prePaymentDate: undefined,
         createCalendarEvent: jobData.createCalendarEvent || false,
     };
     setJobs(prev => [...prev, newJob]);
@@ -215,16 +240,17 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSettings(prev => ({ ...prev, ...newSettings }));
   }, []);
 
-  const addDraftNote = useCallback((draftData: Omit<DraftNote, 'id' | 'createdAt' | 'updatedAt' | 'imageBase64' | 'imageMimeType'>): DraftNote => {
+  const addDraftNote = useCallback((draftData: { title: string, type: 'TEXT' | 'SCRIPT' }): DraftNote => {
     const newDraft: DraftNote = {
       ...draftData,
       id: uuidv4(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      imageBase64: undefined,
-      imageMimeType: undefined,
+      content: draftData.type === 'TEXT' ? '' : '',
+      scriptLines: draftData.type === 'SCRIPT' ? [{ id: uuidv4(), scene: '1', description: '', duration: 0 }] : [],
+      attachments: [],
     };
-    setDraftNotes(prev => [newDraft, ...prev]); // Add to beginning of list
+    setDraftNotes(prev => [newDraft, ...prev]);
     return newDraft;
   }, []);
 

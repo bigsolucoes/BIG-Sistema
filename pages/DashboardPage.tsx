@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { Job, JobStatus }
-from '../types';
-import { PlusCircleIcon, WalletIcon, ClockIcon, CheckCircleIcon, BriefcaseIcon, UsersIcon } from '../constants'; // Changed CurrencyDollarIcon to WalletIcon
+import { Job, JobStatus, Payment } from '../types';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
+import { PlusCircleIcon, WalletIcon, ClockIcon, CheckCircleIcon, BriefcaseIcon, UsersIcon } from '../constants';
 import Modal from '../components/Modal';
 import JobForm from './forms/JobForm'; 
 import ClientForm from './forms/ClientForm'; 
@@ -27,27 +27,28 @@ const DashboardPage: React.FC = () => {
 
 
   const totalToReceive = jobs
-    .filter(job => job.status === JobStatus.FINALIZED && !job.paidAt && !job.isPrePaid) // Exclude pre-paid from "A Receber"
-    .reduce((sum, job) => sum + job.value, 0);
+    .filter(job => !job.isDeleted)
+    .reduce((sum, job) => sum + getJobPaymentSummary(job).remaining, 0);
 
   const receivedLast30Days = jobs
-    .filter(job => {
+    .flatMap(job => job.payments || [])
+    .filter(payment => {
         try {
-            return (job.paidAt || job.paymentDate || job.prePaymentDate) && new Date(job.paymentDate || job.prePaymentDate || job.paidAt!) >= thirtyDaysAgo;
+            return new Date(payment.date) >= thirtyDaysAgo;
         } catch (e) { return false; }
     })
-    .reduce((sum, job) => sum + job.value, 0);
+    .reduce((sum, payment) => sum + payment.amount, 0);
 
   const jobStatusCounts = jobs.reduce((acc, job) => {
     try {
-        if (job.isDeleted || job.status === JobStatus.PAID) return acc; // Ignore deleted or fully paid jobs for this chart
+        if (job.isDeleted || job.status === JobStatus.PAID) return acc;
 
         const deadlineDate = new Date(job.deadline);
         const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < todayStart && job.status !== JobStatus.FINALIZED;
         
         if (isOverdue) {
           acc.Atrasados = (acc.Atrasados || 0) + 1;
-        } else if (job.status === JobStatus.FINALIZED) { // Finalized but not yet paid (and not overdue)
+        } else if (job.status === JobStatus.FINALIZED) { 
           acc.AguardandoPagamento = (acc.AguardandoPagamento || 0) + 1;
         } else if (job.status === JobStatus.REVIEW) {
           acc.AguardandoAprovação = (acc.AguardandoAprovação || 0) + 1;
@@ -66,13 +67,13 @@ const DashboardPage: React.FC = () => {
     EmAndamento: '#007AFF', 
     Atrasados: '#ef4444', 
     AguardandoAprovação: '#eab308', 
-    AguardandoPagamento: '#f97316', // Orange for pending payment
+    AguardandoPagamento: '#f97316',
   };
 
   const upcomingDeadlines = jobs
     .filter(job => {
         try {
-            return job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED && !job.isDeleted && new Date(job.deadline) >= todayStart;
+            return job.status !== JobStatus.PAID && !job.isDeleted && new Date(job.deadline) >= todayStart;
         } catch(e) { return false; }
     })
     .sort((a, b) => {
@@ -176,7 +177,7 @@ const DashboardPage: React.FC = () => {
             <ul className="space-y-3">
               {upcomingDeadlines.map(job => (
                 <li key={job.id} className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <Link to={`/jobs`} className="block"> 
+                  <button onClick={() => {}} className="block w-full text-left"> 
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-text-primary">{job.name}</span>
                       <span className={`text-sm font-semibold ${new Date(job.deadline) < todayStart && job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED ? 'text-red-500' : 'text-accent'}`}>
@@ -185,7 +186,7 @@ const DashboardPage: React.FC = () => {
                     </div>
                     <p className="text-xs text-text-secondary">{clients.find(c => c.id === job.clientId)?.name || 'Cliente desconhecido'}</p>
                     <p className="text-xs text-text-secondary">Prazo: {formatDate(job.deadline)}</p>
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -194,7 +195,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
 
-      <Modal isOpen={isJobModalOpen} onClose={() => setJobModalOpen(false)} title="Adicionar Novo Job">
+      <Modal isOpen={isJobModalOpen} onClose={() => setJobModalOpen(false)} title="Adicionar Novo Job" size="lg">
         <JobForm onSuccess={() => setJobModalOpen(false)} />
       </Modal>
       <Modal isOpen={isClientModalOpen} onClose={() => setClientModalOpen(false)} title="Adicionar Novo Cliente">

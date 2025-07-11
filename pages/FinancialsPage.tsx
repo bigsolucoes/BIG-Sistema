@@ -1,53 +1,63 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, Fragment } from 'react';
 import { useAppData } from '../hooks/useAppData';
-import { Job, FinancialStatus, JobStatus, Client } from '../types';
-import { CheckCircleIcon, ClockIcon, ExclamationCircleIcon, CurrencyDollarIcon } from '../constants';
+import { Job, FinancialJobStatus, JobStatus, Payment } from '../types';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
+import { CheckCircleIcon, ClockIcon, ExclamationCircleIcon, CurrencyDollarIcon, ChevronDownIcon, ChevronUpIcon } from '../constants';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../components/LoadingSpinner';
 import PaymentRegistrationModal from '../components/modals/PaymentRegistrationModal'; 
 import { formatCurrency, formatDate } from '../utils/formatters';
 
+const getFinancialStatus = (job: Job, remaining: number): FinancialJobStatus => {
+    if (job.status === JobStatus.PAID) return FinancialJobStatus.PAID;
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const deadline = new Date(job.deadline); deadline.setHours(0,0,0,0);
+    
+    if (remaining > 0 && deadline < today) {
+        return FinancialJobStatus.OVERDUE;
+    }
+
+    const totalPaid = job.payments.reduce((acc, p) => acc + p.amount, 0);
+    if (totalPaid === 0 && job.status !== JobStatus.BRIEFING) {
+        return FinancialJobStatus.PENDING_DEPOSIT;
+    }
+    if (totalPaid > 0 && remaining > 0) {
+        return FinancialJobStatus.PARTIALLY_PAID;
+    }
+    return FinancialJobStatus.PENDING_FULL_PAYMENT;
+};
+
 const FinancialsPage: React.FC = () => {
   const { jobs, clients, settings, loading } = useAppData(); 
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedJobForPayment, setSelectedJobForPayment] = useState<Job | undefined>(undefined);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
-  const getFinancialStatus = (job: Job): FinancialStatus => {
-    if (job.status === JobStatus.PAID) return FinancialStatus.PAID;
-    if (job.isPrePaid && job.prePaymentDate) return FinancialStatus.PAID; // Pre-paid jobs are considered paid here for listing
-    
-    if (job.status === JobStatus.FINALIZED) {
-        try {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const deadline = new Date(job.deadline); deadline.setHours(0,0,0,0);
-            if (deadline < today) return FinancialStatus.OVERDUE;
-        } catch(e) {/* ignore date parsing error, fallback to pending */}
-        return FinancialStatus.PENDING;
-    }
-    return FinancialStatus.PENDING; 
-  };
-
-  const financialRecords = jobs
-    .filter(job => job.status === JobStatus.FINALIZED || job.status === JobStatus.PAID || job.isPrePaid) // Include pre-paid
+  const financialRecords = useMemo(() => jobs
+    .filter(job => !job.isDeleted)
     .map(job => {
       const client = clients.find(c => c.id === job.clientId);
+      const { totalPaid, remaining, isFullyPaid } = getJobPaymentSummary(job);
       return {
         ...job,
         clientName: client?.name || 'Cliente Desconhecido',
-        financialStatus: getFinancialStatus(job),
+        financialStatus: getFinancialStatus(job, remaining),
+        totalPaid,
+        remaining,
+        isFullyPaid
       };
     })
     .sort((a,b) => {
-        if (a.financialStatus !== FinancialStatus.PAID && b.financialStatus === FinancialStatus.PAID) return -1;
-        if (a.financialStatus === FinancialStatus.PAID && b.financialStatus !== FinancialStatus.PAID) return 1;
+        if (a.isFullyPaid && !b.isFullyPaid) return 1;
+        if (!a.isFullyPaid && b.isFullyPaid) return -1;
         try {
-            // Sort by payment date if available, otherwise deadline
-            const dateA = new Date(a.paymentDate || a.prePaymentDate || a.deadline).getTime();
-            const dateB = new Date(b.paymentDate || b.prePaymentDate || b.deadline).getTime();
-            return dateB - dateA; // Most recent first
+            const dateA = new Date(a.deadline).getTime();
+            const dateB = new Date(b.deadline).getTime();
+            return dateB - dateA;
         } catch (e) { return 0; }
-    });
+    }), [jobs, clients]);
 
   const handleOpenPaymentModal = (job: Job) => {
     setSelectedJobForPayment(job);
@@ -57,30 +67,36 @@ const FinancialsPage: React.FC = () => {
   const handlePaymentSuccess = () => {
     setPaymentModalOpen(false);
     setSelectedJobForPayment(undefined);
-    toast.success('Pagamento registrado com sucesso!');
   };
 
-  const StatusBadge: React.FC<{ status: FinancialStatus; isPrePaid?: boolean }> = ({ status, isPrePaid }) => {
-    let bgColor, textColor, IconComponent, statusText = status;
-    if (isPrePaid && status === FinancialStatus.PAID) { // If it's paid *because* it was pre-paid
-        statusText = "Pré-Pago" as any; // Trick for display
-    }
+  const toggleRowExpansion = (jobId: string) => {
+    setExpandedRowId(prevId => (prevId === jobId ? null : jobId));
+  };
+
+  const StatusBadge: React.FC<{ status: FinancialJobStatus }> = ({ status }) => {
+    let bgColor, textColor, IconComponent, text;
 
     switch (status) {
-      case FinancialStatus.PAID:
-        bgColor = 'bg-green-100'; textColor = 'text-green-700'; IconComponent = CheckCircleIcon;
+      case FinancialJobStatus.PAID:
+        bgColor = 'bg-green-100'; textColor = 'text-green-700'; IconComponent = CheckCircleIcon; text = 'Pago';
         break;
-      case FinancialStatus.OVERDUE:
-        bgColor = 'bg-red-100'; textColor = 'text-red-700'; IconComponent = ExclamationCircleIcon;
+      case FinancialJobStatus.OVERDUE:
+        bgColor = 'bg-red-100'; textColor = 'text-red-700'; IconComponent = ExclamationCircleIcon; text = 'Atrasado';
         break;
-      case FinancialStatus.PENDING:
+      case FinancialJobStatus.PARTIALLY_PAID:
+        bgColor = 'bg-blue-100'; textColor = 'text-blue-700'; IconComponent = ClockIcon; text = 'Parcialmente Pago';
+        break;
+      case FinancialJobStatus.PENDING_DEPOSIT:
+        bgColor = 'bg-yellow-100'; textColor = 'text-yellow-700'; IconComponent = ClockIcon; text = 'Aguardando Entrada';
+        break;
+      case FinancialJobStatus.PENDING_FULL_PAYMENT:
       default:
-        bgColor = 'bg-yellow-100'; textColor = 'text-yellow-700'; IconComponent = ClockIcon;
+        bgColor = 'bg-orange-100'; textColor = 'text-orange-700'; IconComponent = ClockIcon; text = 'Aguardando Pagamento';
         break;
     }
     return (
       <span className={`px-3 py-1 inline-flex items-center text-xs font-semibold rounded-full ${bgColor} ${textColor}`}>
-        <IconComponent size={16} /> <span className="ml-1">{statusText}</span>
+        <IconComponent size={14} /> <span className="ml-1.5">{text}</span>
       </span>
     );
   };
@@ -91,68 +107,97 @@ const FinancialsPage: React.FC = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-text-primary mb-6">Central de Pagamentos</h1>
+      <h1 className="text-3xl font-bold text-text-primary mb-6">Central Financeira</h1>
       
       <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border-color">
             <thead className="bg-slate-50">
                 <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Job</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Cliente</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Valor</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Vencimento</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-8"></th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Job / Cliente</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Valor Total</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Valor Pago</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Restante</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Data Pag.</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Método Pag.</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Obs. Pag.</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Anexo</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">Ações</th>
                 </tr>
             </thead>
             <tbody className="bg-card-bg divide-y divide-border-color">
                 {financialRecords.length > 0 ? financialRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-text-primary">{record.name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">{record.clientName}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                        {formatCurrency(record.value, settings.privacyModeEnabled)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                        {formatDate(record.deadline)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                        <StatusBadge status={record.financialStatus} isPrePaid={record.isPrePaid && record.status !== JobStatus.PAID} />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                        {record.paymentDate ? formatDate(record.paymentDate, { dateStyle: 'short', timeStyle: 'short'}) 
-                         : (record.prePaymentDate ? `${formatDate(record.prePaymentDate, {dateStyle: 'short', timeStyle: 'short'})} (Antecip.)` 
-                         : (record.paidAt ? formatDate(record.paidAt, { dateStyle: 'short', timeStyle: 'short'}) : '---'))}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">{record.paymentMethod || '---'}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary truncate max-w-xs" title={record.paymentNotes}>{record.paymentNotes || '---'}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-text-secondary">
-                        {record.paymentAttachmentName ? (
-                            <span title={record.paymentAttachmentName} className="truncate">{record.paymentAttachmentName.substring(0,20)}{record.paymentAttachmentName.length > 20 ? '...' : ''}</span>
-                        ): '---'}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                    {/* Only show register payment if not fully paid (status is not PAID) and not pre-paid */}
-                    {record.status !== JobStatus.PAID && (
-                        <button
-                        onClick={() => handleOpenPaymentModal(record)}
-                        className="text-accent hover:brightness-90 font-semibold transition-all flex items-center p-1 rounded hover:bg-green-50"
-                        title="Registrar Pagamento Final"
-                        >
-                        <CurrencyDollarIcon size={18} /> <span className="ml-1">Registrar</span>
-                        </button>
+                <Fragment key={record.id}>
+                    <tr className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-4">
+                            {record.payments.length > 0 && (
+                                <button onClick={() => toggleRowExpansion(record.id)} className="p-1 rounded-full hover:bg-slate-200">
+                                    {expandedRowId === record.id ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16}/>}
+                                </button>
+                            )}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-text-primary">{record.name}</div>
+                            <div className="text-xs text-text-secondary">{record.clientName}</div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-text-primary font-semibold">
+                            {formatCurrency(record.value, settings.privacyModeEnabled)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600">
+                            {formatCurrency(record.totalPaid, settings.privacyModeEnabled)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600 font-bold">
+                            {formatCurrency(record.remaining, settings.privacyModeEnabled)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                            <StatusBadge status={record.financialStatus} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                        {!record.isFullyPaid && (
+                            <button
+                            onClick={() => handleOpenPaymentModal(record)}
+                            className="text-accent hover:brightness-90 font-semibold transition-all flex items-center p-1 rounded hover:bg-green-50"
+                            title="Registrar Pagamento"
+                            >
+                            <CurrencyDollarIcon size={18} /> <span className="ml-1">Registrar</span>
+                            </button>
+                        )}
+                        </td>
+                    </tr>
+                    {expandedRowId === record.id && (
+                        <tr className="bg-slate-50">
+                            <td colSpan={7} className="p-0">
+                                <div className="p-4">
+                                    <h4 className="font-semibold text-sm mb-2 text-text-primary">Registros de Pagamento: {record.name}</h4>
+                                    <div className="border border-border-color rounded-lg overflow-hidden">
+                                        <table className="min-w-full">
+                                            <thead className="bg-slate-200">
+                                                <tr>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-text-secondary">Data</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-text-secondary">Valor</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-text-secondary">Método</th>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium text-text-secondary">Observações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-card-bg divide-y divide-border-color">
+                                                {record.payments.map(p => (
+                                                <tr key={p.id}>
+                                                    <td className="px-3 py-2 text-sm text-text-secondary">{formatDate(p.date, {dateStyle: 'short', timeStyle: 'short'})}</td>
+                                                    <td className="px-3 py-2 text-sm text-text-primary">{formatCurrency(p.amount, settings.privacyModeEnabled)}</td>
+                                                    <td className="px-3 py-2 text-sm text-text-secondary">{p.method || '---'}</td>
+                                                    <td className="px-3 py-2 text-sm text-text-secondary">{p.notes || '---'}</td>
+                                                </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                     )}
-                    </td>
-                </tr>
+                </Fragment>
                 )) : (
                 <tr>
-                    <td colSpan={10} className="px-6 py-10 text-center text-sm text-text-secondary">
-                    Nenhum registro financeiro (jobs finalizados ou pagos) para exibir.
+                    <td colSpan={7} className="px-6 py-10 text-center text-sm text-text-secondary">
+                    Nenhum registro financeiro para exibir.
                     </td>
                 </tr>
                 )}

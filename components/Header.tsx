@@ -7,11 +7,13 @@ import { APP_NAME, SettingsIcon, EyeOpenIcon, EyeClosedIcon } from '../constants
 
 const Header: React.FC = () => {
   const { settings, updateSettings } = useAppData();
-  const { logout } = useAuth(); 
+  const { currentUser } = useAuth(); 
   const navigate = useNavigate();
 
   const handleLogoClick = () => {
-    logout(); 
+    if (currentUser) {
+      navigate('/dashboard'); 
+    }
   };
 
   const togglePrivacyMode = () => {
@@ -24,7 +26,7 @@ const Header: React.FC = () => {
       <div 
         onClick={handleLogoClick}
         className="cursor-pointer flex items-center"
-        title="Sair do Sistema"
+        title="Ir para o Dashboard"
       >
         {settings.customLogo ? (
           <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-8 max-h-full max-w-xs object-contain" />

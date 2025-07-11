@@ -1,6 +1,8 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Job, Client } from '../types';
-import { formatCurrency } from '../utils/formatters'; // Import the new formatter
+import { formatCurrency } from '../utils/formatters';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
 
 // Ensure API_KEY is set in your environment variables
 const API_KEY = process.env.API_KEY;
@@ -10,7 +12,7 @@ if (!API_KEY) {
 }
 
 const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-const MODEL_NAME = 'gemini-2.5-flash-preview-04-17'; // Recommended model
+const MODEL_NAME = 'gemini-2.5-flash';
 
 interface AppContextData {
   jobs: Job[];
@@ -24,9 +26,12 @@ const formatDataForPrompt = (data: AppContextData): string => {
   if (data.jobs.length > 0) {
     data.jobs.forEach(job => {
       const clientName = data.clients.find(c => c.id === job.clientId)?.name || 'Desconhecido';
-      // Use formatCurrency with privacyMode explicitly false
-      const jobValueFormatted = formatCurrency(job.value, false); 
-      contextString += `Nome: ${job.name}, Cliente: ${clientName}, Valor: ${jobValueFormatted}, Prazo: ${new Date(job.deadline).toLocaleDateString('pt-BR')}, Status: ${job.status}, Tipo: ${job.serviceType}\n`;
+      const { totalPaid, remaining } = getJobPaymentSummary(job);
+      const jobValueFormatted = formatCurrency(job.value, false);
+      const totalPaidFormatted = formatCurrency(totalPaid, false);
+      const remainingFormatted = formatCurrency(remaining, false);
+
+      contextString += `Nome: ${job.name}, Cliente: ${clientName}, Valor Total: ${jobValueFormatted}, Total Pago: ${totalPaidFormatted}, Saldo Restante: ${remainingFormatted}, Prazo: ${new Date(job.deadline).toLocaleDateString('pt-BR')}, Status: ${job.status}, Tipo: ${job.serviceType}\n`;
     });
   } else {
     contextString += "Nenhum job cadastrado.\n";
@@ -36,10 +41,9 @@ const formatDataForPrompt = (data: AppContextData): string => {
   if (data.clients.length > 0) {
     data.clients.forEach(client => {
       const clientJobs = data.jobs.filter(j => j.clientId === client.id);
-      const totalBilled = clientJobs.reduce((sum, j) => sum + j.value, 0);
-      // Use formatCurrency with privacyMode explicitly false
+      const totalBilled = clientJobs.reduce((sum, j) => sum + getJobPaymentSummary(j).totalPaid, 0);
       const totalBilledFormatted = formatCurrency(totalBilled, false);
-      contextString += `Nome: ${client.name}, Empresa: ${client.company || 'N/A'}, Email: ${client.email}, Total Faturado: ${totalBilledFormatted}\n`;
+      contextString += `Nome: ${client.name}, Empresa: ${client.company || 'N/A'}, Email: ${client.email}, Total Faturado (pago): ${totalBilledFormatted}\n`;
     });
   } else {
     contextString += "Nenhum cliente cadastrado.\n";
@@ -53,12 +57,11 @@ export const callGeminiApi = async (
   appContextData: AppContextData
 ): Promise<GenerateContentResponse> => {
   if (!ai) {
-    return Promise.resolve({
-        text: "Desculpe, o assistente de IA não está configurado corretamente (API Key ausente).",
-        candidates: [],
-        promptFeedback: undefined,
-        usageMetadata: undefined,
-      } as unknown as GenerateContentResponse); 
+    const mockResponse: GenerateContentResponse = {
+      text: "Desculpe, o assistente de IA não está configurado corretamente (API Key ausente).",
+      candidates: [],
+    } as unknown as GenerateContentResponse;
+    return Promise.resolve(mockResponse); 
   }
 
   const dataContext = formatDataForPrompt(appContextData);
@@ -92,11 +95,10 @@ export const callGeminiApi = async (
     if (error instanceof Error) {
         errorMessage += ` Detalhes: ${error.message}`;
     }
-     return Promise.resolve({
+     const mockErrorResponse: GenerateContentResponse = {
         text: errorMessage,
         candidates: [],
-        promptFeedback: undefined,
-        usageMetadata: undefined,
-      } as unknown as GenerateContentResponse);
+      } as unknown as GenerateContentResponse;
+     return Promise.resolve(mockErrorResponse);
   }
 };

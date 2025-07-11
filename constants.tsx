@@ -5,7 +5,7 @@ import {
   Home, Briefcase, Users, CreditCard, BarChartBig, MessageCircle, Link2, FolderArchive, 
   Sparkles, Cog, PlusCircle, X, Trash2, Edit3, CheckCircle, AlertCircle, Clock, 
   DollarSign, Eye, EyeOff, List, ArrowRight, Settings, CalendarDays, Archive as ArchiveIconLucide, FileText, Bot,
-  Save, Check, ChevronLeft, ChevronRight, Wallet, ExternalLink, ImageUp, ImageOff // Added Wallet & ExternalLink, ImageUp, ImageOff
+  Save, Check, ChevronLeft, ChevronRight, Wallet, ExternalLink, ImageUp, ImageOff, Plus, Minus, Table, ChevronDown, ChevronUp, Paperclip
 } from 'lucide-react';
 
 export const APP_NAME = "BIG";
@@ -42,19 +42,23 @@ export const SaveIcon = Save; // Newly added
 export const CheckIcon = Check; // Newly added
 export const ChevronLeftIcon = ChevronLeft; // Newly added
 export const ChevronRightIcon = ChevronRight; // Newly added
+export const ChevronDownIcon = ChevronDown; // Newly added
+export const ChevronUpIcon = ChevronUp; // Newly added
 export const WalletIcon = Wallet; // Newly added for "A Receber"
 export const ExternalLinkIcon = ExternalLink; // Added for Asaas link
 export const ImageUpIcon = ImageUp; // For adding/uploading image
 export const ImageOffIcon = ImageOff; // For removing image
+export const PaperclipIcon = Paperclip; // For attachments
 
 
 // Specific use case icons, might be same as above but named for clarity
 export const PageTrashIcon = Trash2; // For the trash button on JobsPage
 export const RemoveLinkIcon = Trash2; // For removing a link in JobForm
 export const CloudLinkIcon = Link2; // For displaying cloud links in JobDetailsPanel
-export const PlusIcon = PlusCircle; // For add observation button
+export const PlusIcon = Plus; // Changed from PlusCircle for more generic use
+export const MinusIcon = Minus; // For script tool
 export const TrashRestoreIcon = Trash2; // Using Trash2 with a different meaning in context
-export const TableCellsIcon = BriefcaseIcon; // Alias for Kanban view toggle
+export const TableCellsIcon = Table; // Alias for Kanban view toggle
 
 export const NAVIGATION_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: HomeIcon },

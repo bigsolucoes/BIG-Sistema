@@ -1,9 +1,12 @@
-import React, { useState, useCallback, useMemo } from 'react';
+
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus, Client } from '../types';
+import { getJobPaymentSummary } from '../utils/jobCalculations';
 import { 
-    KANBAN_COLUMNS, PlusCircleIcon, PageTrashIcon, BriefcaseIcon, 
-    ListBulletIcon, ArchiveIcon, CurrencyDollarIcon // Corrected from DollarSignIcon
+    KANBAN_COLUMNS, PlusCircleIcon, BriefcaseIcon, 
+    ListBulletIcon, CurrencyDollarIcon, TableCellsIcon,
+    ArchiveIcon, TrashIcon
 } from '../constants';
 import Modal from '../components/Modal';
 import JobForm from './forms/JobForm';
@@ -22,9 +25,11 @@ const JobCard: React.FC<{
   client?: Client; 
   onClick: () => void;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, jobId: string) => void;
+  onDragEnd: () => void;
   isDraggable: boolean;
-}> = 
-  ({ job, client, onClick, onDragStart, isDraggable }) => {
+  onArchive: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+}> = ({ job, client, onClick, onDragStart, onDragEnd, isDraggable, onArchive, onDelete }) => {
   const { settings } = useAppData();
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -32,46 +37,79 @@ const JobCard: React.FC<{
   deadlineDate.setHours(0,0,0,0);
 
   const isOverdue = deadlineDate < today && job.status !== JobStatus.PAID && job.status !== JobStatus.FINALIZED;
-  
+  const { totalPaid, isFullyPaid } = getJobPaymentSummary(job);
+  const paymentProgress = job.value > 0 ? (totalPaid / job.value) * 100 : (isFullyPaid ? 100 : 0);
+
   return (
     <div 
       draggable={isDraggable}
       onDragStart={(e) => isDraggable && onDragStart(e, job.id)}
-      onClick={onClick}
-      className={`p-4 mb-3 rounded-lg shadow-md border border-yellow-200 
-                  bg-yellow-50 hover:shadow-lg transition-all duration-200 cursor-pointer 
-                  ${isDraggable ? 'active:cursor-grabbing' : 'opacity-80'}`}
+      onDragEnd={onDragEnd}
+      className={`mb-3 rounded-lg shadow-md bg-card-bg hover:shadow-lg transition-all duration-200 
+                  flex items-start gap-3 p-4
+                  ${isDraggable ? 'cursor-grab active:cursor-grabbing' : 'opacity-80'}`}
     >
-      <div className="flex justify-between items-start">
-        <h4 className="font-semibold text-md text-gray-800 mb-1">{job.name}</h4>
-        {job.isPrePaid && (
-          <span title="Pagamento antecipado registrado">
-            <CurrencyDollarIcon className="text-green-500 w-4 h-4 flex-shrink-0" />
-          </span>
-        )}
+      {/* Left side action buttons */}
+      <div className="flex flex-col space-y-2 pt-1">
+        <button 
+          onClick={onArchive} 
+          className="p-1 text-slate-500 hover:text-green-500 hover:bg-green-100 rounded-full transition-colors"
+          title="Arquivar Job"
+        >
+          <ArchiveIcon size={18} />
+        </button>
+        <button 
+          onClick={onDelete} 
+          className="p-1 text-slate-500 hover:text-red-500 hover:bg-red-100 rounded-full transition-colors"
+          title="Mover para Lixeira"
+        >
+          <TrashIcon size={18} />
+        </button>
       </div>
-      <p className="text-xs text-gray-600 mb-1">{client?.name || 'Cliente não encontrado'}</p>
-      <p className="text-xs text-gray-600 mb-2">Valor: {formatCurrency(job.value, settings.privacyModeEnabled)}</p>
-      <div className={`text-xs px-2 py-0.5 inline-block rounded-full mb-2 ${
-        isOverdue ? 'bg-red-100 text-red-700' : `bg-blue-100 text-accent`
-      }`}>
-        Prazo: {formatDate(job.deadline)} {isOverdue && '(Atrasado)'}
+
+      {/* Main card content */}
+      <div className="flex-grow cursor-pointer" onClick={onClick}>
+          <div className="flex justify-between items-start">
+            <h4 className="font-semibold text-md text-text-primary mb-1 pr-2">{job.name}</h4>
+            {isFullyPaid && (
+              <span title="Este job foi totalmente pago.">
+                <CurrencyDollarIcon className="text-green-500 w-5 h-5 flex-shrink-0" />
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-text-secondary mb-1">{client?.name || 'Cliente não encontrado'}</p>
+          <p className="text-xs text-text-secondary mb-2">Valor: {formatCurrency(job.value, settings.privacyModeEnabled)}</p>
+          <div className={`text-xs px-2 py-0.5 inline-block rounded-full mb-2 ${
+            isOverdue ? 'bg-red-100 text-red-700' : `bg-blue-100 text-accent`
+          }`}>
+            Prazo: {formatDate(job.deadline)} {isOverdue && '(Atrasado)'}
+          </div>
+          
+          {job.value > 0 && !isFullyPaid && (
+            <div className="mt-2" title={`Pago: ${formatCurrency(totalPaid, settings.privacyModeEnabled)} de ${formatCurrency(job.value, settings.privacyModeEnabled)}`}>
+                <div className="w-full bg-slate-200 rounded-full h-1.5">
+                    <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${paymentProgress}%` }}></div>
+                </div>
+            </div>
+          )}
       </div>
-      <p className="text-xs text-gray-500">Tipo: {job.serviceType}</p>
     </div>
   );
 };
 
 const KanbanColumn: React.FC<{ 
   title: string; 
-  status: JobStatus | 'UNCATEGORIZED_COLUMN'; 
+  status: JobStatus;
   jobsInColumn: Job[]; 
   clients: Client[]; 
   onJobCardClick: (job: Job) => void; 
   onDragStart: (e: React.DragEvent<HTMLDivElement>, jobId: string) => void;
-  onDrop: (e: React.DragEvent<HTMLDivElement>, targetStatus: JobStatus | 'UNCATEGORIZED_COLUMN') => void;
+  onDragEnd: () => void;
+  onDrop: (e: React.DragEvent<HTMLDivElement>, targetStatus: JobStatus) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-}> = ({ title, status, jobsInColumn, clients, onJobCardClick, onDragStart, onDrop, onDragOver }) => {
+  onArchiveJob: (job: Job) => void;
+  onDeleteJob: (jobId: string) => void;
+}> = ({ title, status, jobsInColumn, clients, onJobCardClick, onDragStart, onDragEnd, onDrop, onDragOver, onArchiveJob, onDeleteJob }) => {
   
   const isPaidColumnTarget = status === JobStatus.PAID;
 
@@ -84,7 +122,7 @@ const KanbanColumn: React.FC<{
     >
       <h3 className={`font-semibold text-lg text-text-primary mb-4 sticky top-0 py-2 z-10 
                       ${isPaidColumnTarget ? 'bg-green-50' : 'bg-slate-100'}`}>{title} ({jobsInColumn.length})</h3>
-      <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-310px)]"> 
+      <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-310px)] pr-1"> 
         {jobsInColumn.length > 0 ? jobsInColumn.map(job => (
           <JobCard 
             key={job.id} 
@@ -92,7 +130,10 @@ const KanbanColumn: React.FC<{
             client={clients.find(c => c.id === job.clientId)} 
             onClick={() => onJobCardClick(job)}
             onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
             isDraggable={true}
+            onArchive={(e) => { e.stopPropagation(); onArchiveJob(job); }}
+            onDelete={(e) => { e.stopPropagation(); onDeleteJob(job.id); }}
           />
         )) : <p className="text-sm text-text-secondary text-center py-4">Nenhum job nesta etapa.</p>}
       </div>
@@ -101,8 +142,6 @@ const KanbanColumn: React.FC<{
 };
 
 type ViewMode = 'kanban' | 'list';
-const UNCATEGORIZED_COLUMN_ID = 'UNCATEGORIZED_COLUMN' as const;
-
 
 const JobsPage: React.FC = () => {
   const { jobs, clients, updateJob, deleteJob, settings, loading } = useAppData();
@@ -116,6 +155,7 @@ const JobsPage: React.FC = () => {
   const [selectedJobForPanel, setSelectedJobForPanel] = useState<Job | undefined>(undefined);
   const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(false);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
 
   const activeJobs = useMemo(() => {
@@ -126,6 +166,22 @@ const JobsPage: React.FC = () => {
     setEditingJob(undefined);
     setFormModalOpen(true);
   };
+  
+  const handleArchiveClick = useCallback((job: Job) => {
+    setJobForPaymentModal(job);
+    setPaymentModalOpen(true);
+  }, []);
+
+  const handleDeleteClick = useCallback((jobId: string) => {
+    if (window.confirm('Tem certeza que deseja mover este job para a lixeira?')) {
+      deleteJob(jobId);
+      toast.success('Job movido para a lixeira!');
+      if (selectedJobForPanel?.id === jobId) {
+          setIsDetailsPanelOpen(false);
+          setSelectedJobForPanel(undefined);
+      }
+    }
+  }, [deleteJob, selectedJobForPanel]);
 
   const handleEditJobFromPanel = (job: Job) => {
     setEditingJob(job);
@@ -146,7 +202,7 @@ const JobsPage: React.FC = () => {
     setEditingJob(undefined);
     if(selectedJobForPanel){ 
         const updatedJob = jobs.find(j => j.id === selectedJobForPanel.id);
-        if(updatedJob && !updatedJob.isDeleted && updatedJob.status !== JobStatus.PAID){
+        if(updatedJob && !updatedJob.isDeleted){
             setSelectedJobForPanel(updatedJob);
             setIsDetailsPanelOpen(true);
         } else {
@@ -157,59 +213,68 @@ const JobsPage: React.FC = () => {
   
   const onDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, jobId: string) => {
     e.dataTransfer.setData('jobId', jobId);
+    setIsDragging(true);
   }, []);
 
-  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>, targetStatusValue: JobStatus | typeof UNCATEGORIZED_COLUMN_ID) => {
+  const onDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>, targetStatus: JobStatus) => {
     e.preventDefault();
     const jobId = e.dataTransfer.getData('jobId');
     const jobToMove = jobs.find(j => j.id === jobId);
 
-    if (jobToMove && !jobToMove.isDeleted && jobToMove.status !== JobStatus.PAID) {
-      if (targetStatusValue === JobStatus.PAID) {
-        if (jobToMove.isPrePaid) {
-          updateJob({ 
-            ...jobToMove, 
-            status: JobStatus.PAID, 
-            paidAt: new Date().toISOString(), // Mark as officially paid now
-          });
-          toast.success(`Job "${jobToMove.name}" (pré-pago) arquivado.`);
-          if (jobToMove.id === selectedJobForPanel?.id) {
-            setIsDetailsPanelOpen(false);
-          }
-        } else {
+    if (jobToMove && !jobToMove.isDeleted) {
+      if (targetStatus === JobStatus.PAID) {
           setJobForPaymentModal(jobToMove);
           setPaymentModalOpen(true);
-        }
       } else {
-        let finalStatus: JobStatus = targetStatusValue === UNCATEGORIZED_COLUMN_ID ? JobStatus.BRIEFING : targetStatusValue as JobStatus;
-        let targetColumnName = KANBAN_COLUMNS.find(col => col.status === finalStatus)?.title || "Não Categorizado";
-        
-        if (jobToMove.status !== finalStatus) {
-          updateJob({ ...jobToMove, status: finalStatus });
+        if (jobToMove.status !== targetStatus) {
+          const targetColumnName = KANBAN_COLUMNS.find(col => col.status === targetStatus)?.title || "Não Categorizado";
+          updateJob({ ...jobToMove, status: targetStatus });
           toast.success(`Job "${jobToMove.name}" movido para ${targetColumnName}!`);
         }
       }
     }
-  }, [jobs, updateJob, selectedJobForPanel?.id]);
+  }, [jobs, updateJob]);
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault(); 
   }, []);
 
+  const handleDropOnArchive = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const jobId = e.dataTransfer.getData('jobId');
+    const jobToMove = jobs.find(j => j.id === jobId);
+    if (jobToMove) {
+        setJobForPaymentModal(jobToMove);
+        setPaymentModalOpen(true);
+    }
+    setIsDragging(false);
+  }, [jobs]);
+
+  const handleDropOnTrash = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const jobId = e.dataTransfer.getData('jobId');
+    const jobToMove = jobs.find(j => j.id === jobId);
+    if (jobToMove) {
+        handleDeleteClick(jobToMove.id);
+    }
+    setIsDragging(false);
+  }, [jobs, handleDeleteClick]);
+  
   const handlePaymentModalSuccess = () => {
     setPaymentModalOpen(false);
-    toast.success('Pagamento registrado! Job movido para Financeiro/Arquivo.');
     if (jobForPaymentModal?.id === selectedJobForPanel?.id) {
-        setIsDetailsPanelOpen(false); 
+        const updatedJob = jobs.find(j => j.id === jobForPaymentModal.id);
+        if (updatedJob && updatedJob.status === JobStatus.PAID) {
+             setIsDetailsPanelOpen(false); 
+        } else if (updatedJob) {
+            setSelectedJobForPanel(updatedJob);
+        }
     }
     setJobForPaymentModal(undefined);
-  };
-
-  const handleRegisterPrePaymentSuccess = (updatedJob: Job) => {
-    if (selectedJobForPanel?.id === updatedJob.id) {
-        setSelectedJobForPanel(updatedJob); // Refresh panel with pre-paid status
-    }
-    toast.success('Pagamento antecipado registrado!');
   };
 
   const handleJobCardClick = (job: Job) => {
@@ -217,18 +282,29 @@ const JobsPage: React.FC = () => {
     setIsDetailsPanelOpen(true);
   };
   
-  const handleCloseDetailsPanel = () => {
+  const handleCloseDetailsPanel = useCallback(() => {
     setIsDetailsPanelOpen(false);
     setSelectedJobForPanel(undefined);
-  };
+  }, []);
+
+  // This effect ensures the panel shows fresh data, correcting the observation list bug.
+  useEffect(() => {
+    if (isDetailsPanelOpen && selectedJobForPanel) {
+      const updatedJobInList = jobs.find(j => j.id === selectedJobForPanel.id);
+      if (updatedJobInList) {
+        if (JSON.stringify(selectedJobForPanel) !== JSON.stringify(updatedJobInList)) {
+            setSelectedJobForPanel(updatedJobInList);
+        }
+      } else {
+        handleCloseDetailsPanel();
+      }
+    }
+  }, [jobs, selectedJobForPanel, isDetailsPanelOpen, handleCloseDetailsPanel]);
 
 
   if (loading) {
     return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
   }
-
-  const standardStatuses = KANBAN_COLUMNS.map(col => col.status).filter(s => s !== JobStatus.PAID); 
-  const uncategorizedActiveJobs = activeJobs.filter(job => !standardStatuses.includes(job.status));
 
   return (
     <div className="h-full flex flex-col">
@@ -272,21 +348,13 @@ const JobsPage: React.FC = () => {
                 clients={clients}
                 onJobCardClick={handleJobCardClick}
                 onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onArchiveJob={handleArchiveClick}
+                onDeleteJob={handleDeleteClick}
               />
             ))}
-            <KanbanColumn
-                key={UNCATEGORIZED_COLUMN_ID}
-                title="Não Categorizado"
-                status={UNCATEGORIZED_COLUMN_ID}
-                jobsInColumn={uncategorizedActiveJobs}
-                clients={clients}
-                onJobCardClick={handleJobCardClick}
-                onDragStart={onDragStart}
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-            />
           </div>
         </div>
       ) : (
@@ -305,6 +373,33 @@ const JobsPage: React.FC = () => {
             }}
             privacyModeEnabled={settings.privacyModeEnabled || false}
         />
+      )}
+
+      {/* Drop Zones */}
+      {isDragging && (
+        <>
+          <div 
+            onDrop={handleDropOnArchive}
+            onDragOver={onDragOver}
+            className="fixed bottom-5 left-5 z-20 w-48 h-24 bg-blue-100 border-2 border-dashed border-blue-500 rounded-lg flex items-center justify-center transition-all opacity-90 hover:scale-105 hover:shadow-xl"
+          >
+            <div className="text-center">
+              <ArchiveIcon className="mx-auto text-blue-500" size={24} />
+              <p className="text-blue-700 font-semibold mt-1">Arquivar</p>
+            </div>
+          </div>
+
+          <div 
+            onDrop={handleDropOnTrash}
+            onDragOver={onDragOver}
+            className="fixed bottom-5 right-5 z-20 w-48 h-24 bg-red-100 border-2 border-dashed border-red-500 rounded-lg flex items-center justify-center transition-all opacity-90 hover:scale-105 hover:shadow-xl"
+          >
+            <div className="text-center">
+              <TrashIcon className="mx-auto text-red-500" size={24} />
+              <p className="text-red-700 font-semibold mt-1">Lixeira</p>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Modals and Panels */}
@@ -337,7 +432,8 @@ const JobsPage: React.FC = () => {
                 setIsDetailsPanelOpen(false); 
                 setPaymentModalOpen(true);
             }}
-            onRegisterPrePayment={handleRegisterPrePaymentSuccess} // New prop
+            onOpenArchive={() => navigate('/archive')}
+            onOpenTrash={() => setIsTrashModalOpen(true)}
         />
       )}
       
@@ -345,23 +441,6 @@ const JobsPage: React.FC = () => {
         <TrashModal onClose={() => setIsTrashModalOpen(false)} />
       </Modal>
 
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col space-y-3">
-        <button
-          onClick={() => navigate('/archive')}
-          className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110"
-          title="Abrir Arquivo Morto"
-        >
-          <ArchiveIcon size={24}/>
-        </button>
-        <button
-          onClick={() => setIsTrashModalOpen(true)}
-          className="bg-slate-700 hover:bg-slate-600 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110"
-          title="Abrir Lixeira"
-        >
-          <PageTrashIcon size={24}/>
-        </button>
-      </div>
     </div>
   );
 };

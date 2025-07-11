@@ -1,7 +1,11 @@
+
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { useAppData } from '../../hooks/useAppData';
-import { Job, JobStatus } from '../../types';
+import { Job, JobStatus, Payment } from '../../types';
+import { getJobPaymentSummary } from '../../utils/jobCalculations';
 import toast from 'react-hot-toast';
+import { v4 as uuidv4 } from 'uuid';
+import { formatCurrency } from '../../utils/formatters';
 
 interface PaymentRegistrationFormProps {
   jobToPay: Job;
@@ -9,67 +13,55 @@ interface PaymentRegistrationFormProps {
 }
 
 const PaymentRegistrationForm: React.FC<PaymentRegistrationFormProps> = ({ jobToPay, onSuccess }) => {
-  const { updateJob } = useAppData();
-
-  const [paymentDate, setPaymentDate] = useState<string>('');
+  const { updateJob, settings } = useAppData();
+  const { remaining } = getJobPaymentSummary(jobToPay);
+  
+  const [amount, setAmount] = useState<number>(remaining);
+  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentMethod, setPaymentMethod] = useState<string>('');
-  const [paymentAttachment, setPaymentAttachment] = useState<File | null>(null);
-  const [paymentAttachmentName, setPaymentAttachmentName] = useState<string>(jobToPay.paymentAttachmentName || '');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
-
+  
   useEffect(() => {
-    // Pre-fill with today's date if new, or existing payment date
-    if (jobToPay.paymentDate) {
-        setPaymentDate(new Date(jobToPay.paymentDate).toISOString().split('T')[0]);
-    } else if (jobToPay.paidAt) { // Fallback to paidAt if paymentDate is not set
-        setPaymentDate(new Date(jobToPay.paidAt).toISOString().split('T')[0]);
-    } else {
-        setPaymentDate(new Date().toISOString().split('T')[0]);
-    }
-    setPaymentMethod(jobToPay.paymentMethod || '');
-    setPaymentNotes(jobToPay.paymentNotes || '');
-    setPaymentAttachmentName(jobToPay.paymentAttachmentName || '');
-    // Note: Can't pre-fill file input for security reasons
+    setAmount(getJobPaymentSummary(jobToPay).remaining);
   }, [jobToPay]);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) { // Max 5MB for attachment
-        toast.error('Arquivo de anexo muito grande. Máximo 5MB.');
-        setPaymentAttachment(null);
-        setPaymentAttachmentName('');
-        e.target.value = ''; // Clear file input
-        return;
-      }
-      setPaymentAttachment(file);
-      setPaymentAttachmentName(file.name);
-    } else {
-      setPaymentAttachment(null);
-      // If user clears selection, keep existing name if jobToPay had one, otherwise clear
-      setPaymentAttachmentName(jobToPay.paymentAttachmentName && !e.target.files?.length ? jobToPay.paymentAttachmentName : '');
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (amount <= 0) {
+      toast.error('O valor do pagamento deve ser maior que zero.');
+      return;
+    }
     if (!paymentDate) {
-      toast.error('Data do Pagamento é obrigatória.');
+      toast.error('A data do pagamento é obrigatória.');
       return;
     }
 
-    const updatedJobData: Partial<Job> = {
-      status: JobStatus.PAID,
-      paidAt: new Date(paymentDate + "T00:00:00.000Z").toISOString(), // Ensure paidAt is also updated if it's the primary timestamp for "paid"
-      paymentDate: new Date(paymentDate + "T00:00:00.000Z").toISOString(),
-      paymentMethod: paymentMethod || undefined,
-      paymentNotes: paymentNotes || undefined,
-      paymentAttachmentName: paymentAttachmentName || undefined,
-      // paymentAttachmentData: If storing base64, process `paymentAttachment` here
+    const newPayment: Payment = {
+        id: uuidv4(),
+        amount: Number(amount),
+        date: new Date(paymentDate + "T12:00:00.000Z").toISOString(), // Use midday to avoid timezone issues
+        method: paymentMethod || undefined,
+        notes: paymentNotes || undefined,
+    };
+    
+    const updatedPayments = [...jobToPay.payments, newPayment];
+    const newSummary = getJobPaymentSummary({ ...jobToPay, payments: updatedPayments });
+
+    const updatedJob: Job = {
+      ...jobToPay,
+      payments: updatedPayments,
+      status: newSummary.isFullyPaid ? JobStatus.PAID : jobToPay.status,
     };
 
-    updateJob({ ...jobToPay, ...updatedJobData });
-    // toast.success('Pagamento registrado com sucesso!'); // Toast moved to FinancialsPage onSuccess
+    updateJob(updatedJob);
+    
+    if (newSummary.isFullyPaid) {
+        toast.success('Pagamento final registrado! Job arquivado.');
+    } else {
+        toast.success(`Pagamento de ${formatCurrency(amount, false)} registrado!`);
+    }
+
     onSuccess();
   };
   
@@ -77,6 +69,25 @@ const PaymentRegistrationForm: React.FC<PaymentRegistrationFormProps> = ({ jobTo
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+       <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
+            <p className="text-sm text-text-secondary">Saldo Restante para {jobToPay.name}</p>
+            <p className="text-2xl font-bold text-red-600">{formatCurrency(remaining, settings.privacyModeEnabled)}</p>
+       </div>
+
+      <div>
+        <label htmlFor="amount" className="block text-sm font-medium text-text-secondary mb-1">Valor a Registrar (R$) <span className="text-red-500">*</span></label>
+        <input 
+          type="number" 
+          id="amount" 
+          value={amount} 
+          onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} 
+          className={commonInputClass} 
+          required 
+          min="0.01"
+          step="0.01"
+        />
+      </div>
+
       <div>
         <label htmlFor="paymentDate" className="block text-sm font-medium text-text-secondary mb-1">Data do Pagamento <span className="text-red-500">*</span></label>
         <input 
@@ -100,25 +111,14 @@ const PaymentRegistrationForm: React.FC<PaymentRegistrationFormProps> = ({ jobTo
           placeholder="Ex: PIX, Transferência Bancária"
         />
       </div>
-
-      <div>
-        <label htmlFor="paymentAttachment" className="block text-sm font-medium text-text-secondary mb-1">Anexo (Comprovante - Opcional, máx 5MB)</label>
-        <input 
-          type="file" 
-          id="paymentAttachment" 
-          onChange={handleFileChange} 
-          className={`${commonInputClass} file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:brightness-90`}
-        />
-        {paymentAttachmentName && !paymentAttachment && <p className="text-xs text-text-secondary mt-1">Anexo atual: {paymentAttachmentName}</p>}
-      </div>
-
+      
       <div>
         <label htmlFor="paymentNotes" className="block text-sm font-medium text-text-secondary mb-1">Observações do Pagamento</label>
         <textarea 
           id="paymentNotes" 
           value={paymentNotes} 
           onChange={(e) => setPaymentNotes(e.target.value)} 
-          rows={3} 
+          rows={2} 
           className={commonInputClass} 
           placeholder="Detalhes adicionais sobre o pagamento..."
         />
