@@ -162,9 +162,26 @@ const JobsPage: React.FC = () => {
   };
   
   const handleArchiveClick = useCallback((job: Job) => {
-    setJobForPaymentModal(job);
-    setPaymentModalOpen(true);
-  }, []);
+    if (window.confirm(`Tem certeza que deseja arquivar o job "${job.name}"? O status será alterado para 'Pago' e ele será movido para o Arquivo Morto.`)) {
+      const { remaining, isFullyPaid } = getJobPaymentSummary(job);
+      
+      if (!isFullyPaid) {
+        const confirmMessage = `Este job ainda tem um saldo devedor de ${formatCurrency(remaining, false)}. Deseja arquivá-lo mesmo assim?`;
+        if (!window.confirm(confirmMessage)) {
+          return; // User cancelled
+        }
+      }
+
+      updateJob({ ...job, status: JobStatus.PAID });
+      toast.success(`Job "${job.name}" arquivado com sucesso!`);
+      
+      // If the job was open in the details panel, close it
+      if (selectedJobForPanel?.id === job.id) {
+        setIsDetailsPanelOpen(false);
+        setSelectedJobForPanel(undefined);
+      }
+    }
+  }, [updateJob, selectedJobForPanel]);
 
   const handleDeleteClick = useCallback((jobId: string) => {
     if (window.confirm('Tem certeza que deseja mover este job para a lixeira?')) {
@@ -216,8 +233,7 @@ const JobsPage: React.FC = () => {
 
     if (jobToMove && !jobToMove.isDeleted) {
       if (targetStatus === JobStatus.PAID) {
-          setJobForPaymentModal(jobToMove);
-          setPaymentModalOpen(true);
+          handleArchiveClick(jobToMove);
       } else {
         if (jobToMove.status !== targetStatus) {
           const targetColumnName = KANBAN_COLUMNS.find(col => col.status === targetStatus)?.title || "Não Categorizado";
@@ -226,7 +242,7 @@ const JobsPage: React.FC = () => {
         }
       }
     }
-  }, [jobs, updateJob]);
+  }, [jobs, updateJob, handleArchiveClick]);
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault(); 

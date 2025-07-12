@@ -11,23 +11,29 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import PaymentRegistrationModal from '../components/modals/PaymentRegistrationModal'; 
 import { formatCurrency, formatDate } from '../utils/formatters';
 
-const getFinancialStatus = (job: Job, remaining: number): FinancialJobStatus => {
-    if (job.status === JobStatus.PAID) return FinancialJobStatus.PAID;
+const getFinancialStatus = (job: Job, totalPaid: number, remaining: number): FinancialJobStatus => {
+    if (job.status === JobStatus.PAID || (job.value > 0 && remaining <= 0)) {
+        return FinancialJobStatus.PAID;
+    }
 
-    const today = new Date(); today.setHours(0,0,0,0);
-    const deadline = new Date(job.deadline); deadline.setHours(0,0,0,0);
-    
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const deadline = new Date(job.deadline); deadline.setHours(0, 0, 0, 0);
+
     if (remaining > 0 && deadline < today) {
         return FinancialJobStatus.OVERDUE;
     }
 
-    const totalPaid = job.payments.reduce((acc, p) => acc + p.amount, 0);
-    if (totalPaid === 0 && job.status !== JobStatus.BRIEFING) {
+    // User's specific request for 40% during briefing is important
+    if (job.status === JobStatus.BRIEFING && job.value > 0 && totalPaid < (job.value * 0.4)) {
         return FinancialJobStatus.PENDING_DEPOSIT;
     }
-    if (totalPaid > 0 && remaining > 0) {
-        return FinancialJobStatus.PARTIALLY_PAID;
+
+    // For all other cases with a remaining balance
+    if (remaining > 0) {
+        return totalPaid > 0 ? FinancialJobStatus.PARTIALLY_PAID : FinancialJobStatus.PENDING_DEPOSIT;
     }
+    
+    // Fallback for cases like 0-value jobs, etc.
     return FinancialJobStatus.PENDING_FULL_PAYMENT;
 };
 
@@ -45,7 +51,7 @@ const FinancialsPage: React.FC = () => {
       return {
         ...job,
         clientName: client?.name || 'Cliente Desconhecido',
-        financialStatus: getFinancialStatus(job, remaining),
+        financialStatus: getFinancialStatus(job, totalPaid, remaining),
         totalPaid,
         remaining,
         isFullyPaid
