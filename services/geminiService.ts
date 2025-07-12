@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { Job, Client } from '../types';
+import { Job, Client, CalendarEvent } from '../types';
 import { formatCurrency } from '../utils/formatters';
 import { getJobPaymentSummary } from '../utils/jobCalculations';
 
@@ -17,6 +17,7 @@ const MODEL_NAME = 'gemini-2.5-flash';
 interface AppContextData {
   jobs: Job[];
   clients: Client[];
+  calendarEvents?: CalendarEvent[];
 }
 
 // AI should always see real values, regardless of UI privacy mode
@@ -48,6 +49,23 @@ const formatDataForPrompt = (data: AppContextData): string => {
   } else {
     contextString += "Nenhum cliente cadastrado.\n";
   }
+
+  if (data.calendarEvents && data.calendarEvents.length > 0) {
+    contextString += "\n--- Próximos Eventos do Calendário ---\n";
+    const upcomingEvents = data.calendarEvents
+      .filter(event => new Date(event.start) >= new Date())
+      .sort((a,b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      .slice(0, 10);
+    
+    if (upcomingEvents.length > 0) {
+        upcomingEvents.forEach(event => {
+            contextString += `Evento: ${event.title}, Data: ${new Date(event.start).toLocaleString('pt-BR')}, Origem: ${event.source}\n`;
+        });
+    } else {
+        contextString += "Nenhum evento futuro no calendário.\n";
+    }
+  }
+
   contextString += "---\n";
   return contextString;
 };
@@ -67,7 +85,7 @@ export const callGeminiApi = async (
   const dataContext = formatDataForPrompt(appContextData);
 
   const systemInstruction = `Você é um assistente de IA para o sistema BIG, uma plataforma de gestão para freelancers criativos. 
-  Sua principal função é ajudar o usuário a analisar e obter informações sobre seus jobs, clientes e finanças, com base nos dados fornecidos. 
+  Sua principal função é ajudar o usuário a analisar e obter informações sobre seus jobs, clientes, finanças e calendário, com base nos dados fornecidos. 
   Seja conciso, direto e amigável. Use o formato de moeda R$ (Reais Brasileiros) quando apropriado.
   Responda em Português do Brasil.
   Se a pergunta for sobre eventos atuais ou informações que não estão nos dados fornecidos, você pode usar o Google Search.

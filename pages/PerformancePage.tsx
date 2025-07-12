@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, Client, ServiceType } from '../types';
@@ -8,7 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { formatCurrency } from '../utils/formatters';
 
 const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="bg-card-bg p-6 rounded-xl shadow-lg">
+  <div className="bg-card-bg p-6 rounded-xl shadow-lg border border-border-color">
     <h2 className="text-xl font-semibold text-text-primary mb-4">{title}</h2>
     <div className="h-72 md:h-96"> 
       {children}
@@ -18,9 +20,9 @@ const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ tit
 
 const KPICard: React.FC<{ title: string; value: string | number; unit?: string; isCurrency?: boolean; privacyModeEnabled?: boolean }> = 
   ({ title, value, unit, isCurrency = false, privacyModeEnabled = false }) => (
-  <div className="bg-card-bg p-6 rounded-xl shadow-lg text-center">
+  <div className="bg-card-bg p-6 rounded-xl shadow-lg text-center border border-border-color">
     <h3 className="text-md font-medium text-text-secondary mb-1">{title}</h3>
-    <p className="text-3xl font-bold text-accent">
+    <p className="text-3xl font-bold text-blue-600">
       {isCurrency 
         ? formatCurrency(typeof value === 'number' ? value : parseFloat(value.toString()), privacyModeEnabled) 
         : (typeof value === 'number' ? value.toLocaleString('pt-BR', {minimumFractionDigits: 1 , maximumFractionDigits: 1}) : value)
@@ -38,7 +40,6 @@ const PerformancePage: React.FC = () => {
     return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
   }
   const privacyMode = settings.privacyModeEnabled || false;
-  const accentColor = settings.accentColor || '#007AFF'; 
   const activeJobs = jobs.filter(job => !job.isDeleted);
   const paidJobs = activeJobs.filter(job => getJobPaymentSummary(job).isFullyPaid);
 
@@ -114,7 +115,7 @@ const PerformancePage: React.FC = () => {
     return { name: service, value: total };
   }).filter(s => s.value > 0).sort((a,b) => b.value - a.value);
 
-  const PIE_COLORS = ['#007AFF', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#A0522D', '#D2691E', '#8A2BE2'];
+  const PIE_COLORS = ['#3b82f6', '#22c55e', '#f97316', '#ef4444', '#a855f7']; // blue, green, orange, red, purple
 
   // Valor Médio por Job (Pago)
   const averageJobValue = paidJobs.length > 0 ? paidJobs.reduce((sum, job) => sum + job.value, 0) / paidJobs.length : 0;
@@ -159,7 +160,7 @@ const PerformancePage: React.FC = () => {
                 <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
-                <Bar dataKey="Receita" fill={accentColor} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receita" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
@@ -174,7 +175,7 @@ const PerformancePage: React.FC = () => {
                 <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
-                <Line type="monotone" dataKey="Receita" stroke={accentColor} strokeWidth={2} />
+                <Line type="monotone" dataKey="Receita" stroke="#3b82f6" strokeWidth={2} />
                 <Line type="monotone" dataKey="Custo" stroke="#f43f5e" strokeWidth={2} />
                 <Line type="monotone" dataKey="Lucro" stroke="#22c55e" strokeWidth={3} />
               </LineChart>
@@ -214,7 +215,7 @@ const PerformancePage: React.FC = () => {
                 <XAxis type="number" tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#64748b', fontSize: 11 }} />
                 <Tooltip formatter={(value: number) => formatCurrency(value, privacyMode)} />
-                <Bar dataKey="value" fill={accentColor} radius={[0, 4, 4, 0]} barSize={20}>
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
                     {serviceRevenue.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}

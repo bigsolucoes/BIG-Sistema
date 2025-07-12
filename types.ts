@@ -60,6 +60,7 @@ export interface Job {
   observationsLog?: JobObservation[];
   payments: Payment[]; // Replaces all old payment fields
   createCalendarEvent?: boolean; // For Google Calendar integration
+  calendarEventId?: string; // ID of the event created in the calendar
 }
 
 export enum FinancialJobStatus {
@@ -106,6 +107,7 @@ export interface AppSettings {
   splashScreenBackgroundColor?: string;
   privacyModeEnabled?: boolean; 
   googleCalendarConnected?: boolean;
+  googleCalendarLastSync?: string;
 }
 
 export interface User {
@@ -135,4 +137,14 @@ export interface DraftNote {
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string; // ISO String
+  end: string; // ISO String
+  allDay: boolean;
+  source: 'google' | 'big';
+  jobId?: string;
 }

@@ -1,14 +1,14 @@
-
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus } from '../types';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { ArchiveIcon as PageIcon, TrashIcon } from '../constants';
+import { RotateCcw as RestoreIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ArchivePage: React.FC = () => {
-  const { jobs, clients, settings, loading, deleteJob } = useAppData();
+  const { jobs, clients, settings, loading, deleteJob, updateJob } = useAppData();
 
   if (loading) {
     return <div className="flex justify-center items-center h-full"><LoadingSpinner /></div>;
@@ -24,10 +24,19 @@ const ArchivePage: React.FC = () => {
         } catch { return 0; }
     });
 
-  const handleDeleteFromArchive = (job: Job) => {
-    if (window.confirm(`Tem certeza que deseja mover o job arquivado "${job.name}" para a lixeira? Ele poderá ser restaurado a partir de lá.`)) {
+  const handleDeleteFromArchive = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (job && window.confirm(`Tem certeza que deseja mover o job arquivado "${job.name}" para a lixeira? Ele poderá ser restaurado a partir de lá.`)) {
         deleteJob(job.id);
         toast.success('Job movido para a lixeira!');
+    }
+  };
+
+  const handleUnarchive = (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (job && window.confirm(`Tem certeza que deseja desarquivar o job "${job.name}"? Ele voltará para a coluna "Finalizado".`)) {
+      updateJob({ ...job, status: JobStatus.FINALIZED });
+      toast.success('Job desarquivado com sucesso!');
     }
   };
 
@@ -43,13 +52,13 @@ const ArchivePage: React.FC = () => {
       </p>
 
       {archivedJobs.length === 0 ? (
-        <div className="text-center py-10 bg-card-bg rounded-xl shadow">
+        <div className="text-center py-10 bg-card-bg rounded-xl shadow border border-border-color">
           <PageIcon size={48} className="text-slate-400 mx-auto mb-4" />
           <p className="text-xl text-text-secondary">Nenhum job arquivado ainda.</p>
           <p className="mt-2 text-text-secondary">Jobs com status "Pago" aparecerão aqui.</p>
         </div>
       ) : (
-        <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden">
+        <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden border border-border-color">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border-color">
               <thead className="bg-slate-50">
@@ -79,9 +88,16 @@ const ArchivePage: React.FC = () => {
                         {formatDate(lastPaymentDate, { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">{job.serviceType}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                           <button
-                            onClick={() => handleDeleteFromArchive(job)}
+                            onClick={() => handleUnarchive(job.id)}
+                            className="text-slate-500 hover:text-blue-500 p-1"
+                            title="Desarquivar Job"
+                          >
+                            <RestoreIcon size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFromArchive(job.id)}
                             className="text-slate-500 hover:text-red-500 p-1"
                             title="Mover para Lixeira"
                           >

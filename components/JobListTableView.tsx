@@ -33,7 +33,7 @@ const JobListTableView: React.FC<JobListTableViewProps> = ({ jobs, clients, onEd
   });
   
   return (
-    <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden">
+    <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden border border-border-color">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border-color">
           <thead className="bg-slate-50">

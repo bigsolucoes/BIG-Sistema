@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useRef, ChangeEvent } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { DraftNote, ScriptLine, Attachment } from '../types';
@@ -185,7 +186,7 @@ const DraftsPage: React.FC = () => {
   return (
     <div className="flex h-full gap-6">
       {/* Sidebar for Draft List */}
-      <div className="w-1/3 min-w-[280px] max-w-[350px] bg-card-bg shadow-lg rounded-xl p-4 flex flex-col">
+      <div className="w-1/3 min-w-[280px] max-w-[350px] bg-card-bg shadow-lg rounded-xl p-4 flex flex-col border border-border-color">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-text-primary flex items-center">
             <DraftIcon size={22} className="mr-2 text-accent"/> Meus Rascunhos
@@ -217,7 +218,7 @@ const DraftsPage: React.FC = () => {
       </div>
 
       {/* Main Editor Area */}
-      <div className="flex-grow bg-card-bg shadow-lg rounded-xl flex flex-col">
+      <div className="flex-grow bg-card-bg shadow-lg rounded-xl flex flex-col border border-border-color">
         {selectedDraft ? (
           <>
             <div className="flex justify-between items-center p-4 border-b border-border-color">

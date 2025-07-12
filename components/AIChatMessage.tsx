@@ -21,7 +21,7 @@ const AIChatMessage: React.FC<{ message: AIChatMessageType }> = ({ message }) =>
           </div>
         )}
         <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-        <div className={`text-xs mt-1 ${isUser ? 'text-blue-200 text-right' : 'text-slate-400 text-left'}`}>
+        <div className={`text-xs mt-1 ${isUser ? 'text-slate-300 text-right' : 'text-slate-400 text-left'}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>
       </div>

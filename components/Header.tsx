@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../hooks/useAppData';
@@ -21,7 +20,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-card-bg text-text-primary p-4 shadow-md flex justify-between items-center h-16 sticky top-0 z-30"> {/* Added sticky and z-index */}
+    <header className="bg-card-bg text-text-primary py-4 px-6 sm:px-8 shadow-md flex justify-between items-center h-20 sticky top-0 z-30">
       {/* Logo on the left */}
       <div 
         onClick={handleLogoClick}
@@ -29,9 +28,9 @@ const Header: React.FC = () => {
         title="Ir para o Dashboard"
       >
         {settings.customLogo ? (
-          <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-8 max-h-full max-w-xs object-contain" />
+          <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-12 max-h-full max-w-xs object-contain" />
         ) : (
-          <span className="text-2xl font-bold text-accent">{APP_NAME}</span>
+          <span className="text-5xl font-bold text-slate-900 font-robuck tracking-wide">{APP_NAME}</span>
         )}
       </div>
 

@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { NAVIGATION_ITEMS, APP_NAME, ACCENT_COLOR, ExternalLinkIcon } from '../constants';
-import { LucideProps } from 'lucide-react'; // For typing item.icon
-import { useAppData } from '../hooks/useAppData'; // For Asaas URL from settings
+import { NAVIGATION_ITEMS, APP_NAME, ExternalLinkIcon } from '../constants';
+import { LucideProps } from 'lucide-react';
+import { useAppData } from '../hooks/useAppData';
 
 interface NavigationItem {
   name: string;
   path: string;
-  icon: React.ComponentType<LucideProps>; // Ensure icon is a component type
+  icon: React.ComponentType<LucideProps>;
 }
 
 const Sidebar: React.FC = () => {
@@ -19,9 +19,8 @@ const Sidebar: React.FC = () => {
   const googlePhotosUrl = 'https://photos.google.com';
 
   return (
-    <div className={`w-64 p-5 hidden md:flex md:flex-col space-y-2 h-full shadow-lg 
-                    bg-slate-800 bg-opacity-75 backdrop-filter backdrop-blur-lg 
-                    text-slate-100 border-r border-slate-700`}>
+    <div className={`w-64 p-4 hidden md:flex md:flex-col space-y-2 h-full shadow-2xl 
+                    bg-slate-900 text-slate-300 border-r border-slate-800`}>
       <nav className="flex-grow mt-4"> 
         <ul>
           {(NAVIGATION_ITEMS as NavigationItem[]).map((item) => {
@@ -31,13 +30,19 @@ const Sidebar: React.FC = () => {
                 <NavLink
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-700 transition-colors duration-200 ease-in-out filter hover:brightness-100 ${
-                      isActive ? `bg-${ACCENT_COLOR} text-white shadow-md` : 'hover:text-slate-50'
+                    `flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ease-in-out group ${
+                      isActive 
+                        ? 'bg-accent font-semibold text-white shadow-lg shadow-accent/20' 
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`
                   }
                 >
-                  {IconComponent && <IconComponent size={20} />}
-                  <span>{item.name}</span>
+                  {({ isActive }) => (
+                    <>
+                      {IconComponent && <IconComponent size={20} className={`transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />}
+                      <span>{item.name}</span>
+                    </>
+                  )}
                 </NavLink>
               </li>
             );
@@ -46,12 +51,12 @@ const Sidebar: React.FC = () => {
       </nav>
 
       {/* External Links Section */}
-      <div className="mt-4 pt-4 border-t border-slate-600 space-y-2">
+      <div className="mt-4 pt-4 border-t border-slate-700 space-y-2">
         <a
           href={asaasUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors duration-200 ease-in-out filter hover:brightness-110"
+          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors duration-200 ease-in-out"
         >
           <ExternalLinkIcon size={20} />
           <span>Acessar Asaas</span>
@@ -60,7 +65,7 @@ const Sidebar: React.FC = () => {
           href={googleDriveUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors duration-200 ease-in-out filter hover:brightness-110"
+          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors duration-200 ease-in-out"
         >
           <ExternalLinkIcon size={20} />
           <span>Acessar Drive</span>
@@ -69,14 +74,14 @@ const Sidebar: React.FC = () => {
           href={googlePhotosUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 hover:text-white transition-colors duration-200 ease-in-out filter hover:brightness-110"
+          className="flex items-center space-x-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors duration-200 ease-in-out"
         >
           <ExternalLinkIcon size={20} />
           <span>Acessar Google Fotos</span>
         </a>
       </div>
 
-      <div className="text-center text-xs text-slate-400 mt-auto pt-4 pb-2"> {/* Added pt-4 to give space from external links */}
+      <div className="text-center text-xs text-slate-500 mt-auto pt-4 pb-2">
         <p>&copy; {new Date().getFullYear()} {APP_NAME}</p>
         <p>BIG Soluções</p>
       </div>

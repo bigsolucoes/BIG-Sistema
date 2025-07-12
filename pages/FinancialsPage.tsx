@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useMemo, Fragment } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, FinancialJobStatus, JobStatus, Payment } from '../types';
@@ -84,7 +86,7 @@ const FinancialsPage: React.FC = () => {
         bgColor = 'bg-red-100'; textColor = 'text-red-700'; IconComponent = ExclamationCircleIcon; text = 'Atrasado';
         break;
       case FinancialJobStatus.PARTIALLY_PAID:
-        bgColor = 'bg-blue-100'; textColor = 'text-blue-700'; IconComponent = ClockIcon; text = 'Parcialmente Pago';
+        bgColor = 'bg-slate-100'; textColor = 'text-slate-700'; IconComponent = ClockIcon; text = 'Parcialmente Pago';
         break;
       case FinancialJobStatus.PENDING_DEPOSIT:
         bgColor = 'bg-yellow-100'; textColor = 'text-yellow-700'; IconComponent = ClockIcon; text = 'Aguardando Entrada';
@@ -109,7 +111,7 @@ const FinancialsPage: React.FC = () => {
     <div>
       <h1 className="text-3xl font-bold text-text-primary mb-6">Central Financeira</h1>
       
-      <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden">
+      <div className="bg-card-bg shadow-lg rounded-xl overflow-hidden border border-border-color">
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border-color">
             <thead className="bg-slate-50">

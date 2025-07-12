@@ -7,6 +7,12 @@
     <title>BIG Soluções</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style type="text/tailwindcss">
+        @font-face {
+            font-family: 'Robuck Regular';
+            src: url('https://db.onlinewebfonts.com/t/3d94949602e19c63a7597950c0c242e8.woff2') format('woff2');
+            font-weight: 400;
+            font-style: normal;
+        }
         @layer utilities {
           .animate-modalShow {
             animation: modalShow 0.3s forwards;
@@ -24,13 +30,13 @@
         }
         /* Define custom theme colors for Tailwind JIT */
         body {
-            --color-main-bg: #FFFFFF; /* White */
+            --color-main-bg: #f8fafc; /* slate-50 */
             --color-card-bg: #ffffff; /* white */
-            --color-text-primary: #1D1D1F; /* Dark Graphite */
-            --color-text-secondary: #71717a; /* zinc-500 (Medium Gray) - Kept as neutral secondary */
-            --color-accent: #007AFF; /* Vibrant Blue */
-            --color-border-color: #d4d4d8; /* zinc-300 (Light Gray Border) - Kept as neutral border */
-            --color-input-focus-border: #007AFF; /* Vibrant Blue for focus */
+            --color-text-primary: #0f172a; /* slate-900 */
+            --color-text-secondary: #64748b; /* slate-500 */
+            --color-accent: #1e293b; /* slate-800 */
+            --color-border-color: #e2e8f0; /* slate-200 */
+            --color-input-focus-border: #1e293b; /* slate-800 */
         }
         .bg-main-bg { background-color: var(--color-main-bg); }
         .bg-card-bg { background-color: var(--color-card-bg); }
@@ -53,13 +59,16 @@
       tailwind.config = {
         theme: {
           extend: {
+            fontFamily: {
+              'robuck': ['Robuck Regular', 'sans-serif'],
+            },
             colors: {
               'main-bg': 'var(--color-main-bg)',
               'card-bg': 'var(--color-card-bg)',
               'text-primary': 'var(--color-text-primary)',
               'text-secondary': 'var(--color-text-secondary)',
-              'accent': 'var(--color-accent)', // New Blue
-              'custom-brown': 'var(--color-accent)', // Mapped to new blue, as ACCENT_COLOR constant uses "custom-brown"
+              'accent': 'var(--color-accent)', // New Gray Accent
+              'custom-brown': 'var(--color-accent)', // Mapped to new gray accent
               'border-color': 'var(--color-border-color)',
               'input-focus-border': 'var(--color-input-focus-border)',
             },

@@ -6,24 +6,23 @@ import { APP_NAME, SettingsIcon as PageIcon, CalendarIcon, LinkIcon } from '../c
 import LoadingSpinner from '../components/LoadingSpinner'; 
 
 const SettingsPage: React.FC = () => {
-  const { settings, updateSettings, loading } = useAppData();
+  const { settings, updateSettings, loading, connectGoogleCalendar, disconnectGoogleCalendar } = useAppData();
   
+  const [isConnecting, setIsConnecting] = useState(false);
   const [customLogoPreview, setCustomLogoPreview] = useState<string | undefined>(settings.customLogo);
   const [asaasUrlInput, setAsaasUrlInput] = useState(settings.asaasUrl || '');
-  // const [googleDriveUrlInput, setGoogleDriveUrlInput] = useState(settings.googleDriveUrl || ''); // Removed
   const [userNameInput, setUserNameInput] = useState(settings.userName || '');
-  const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#FFFFFF');
-  const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#007AFF');
+  const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#f8fafc');
+  const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#1e293b');
   const [splashBgColorInput, setSplashBgColorInput] = useState(settings.splashScreenBackgroundColor || '#111827');
 
   useEffect(() => {
     if (!loading) {
       setCustomLogoPreview(settings.customLogo);
       setAsaasUrlInput(settings.asaasUrl || 'https://www.asaas.com/login');
-      // setGoogleDriveUrlInput(settings.googleDriveUrl || 'https://drive.google.com'); // Removed
       setUserNameInput(settings.userName || '');
-      setPrimaryColorInput(settings.primaryColor || '#FFFFFF');
-      setAccentColorInput(settings.accentColor || '#007AFF');
+      setPrimaryColorInput(settings.primaryColor || '#f8fafc');
+      setAccentColorInput(settings.accentColor || '#1e293b');
       setSplashBgColorInput(settings.splashScreenBackgroundColor || '#111827');
     }
   }, [settings, loading]);
@@ -47,23 +46,21 @@ const SettingsPage: React.FC = () => {
     setCustomLogoPreview(undefined);
   }
 
-  const handleConnectGoogleCalendar = () => {
-    console.log("Attempting to connect to Google Calendar via Settings...");
-    toast('Simulando conexão com Google Calendar...', { icon: '🗓️' });
-    setTimeout(() => {
-        const success = Math.random() > 0.3; 
-        if (success) {
-            updateSettings({ googleCalendarConnected: true });
-            toast.success('Google Calendar conectado (simulado)!');
-        } else {
-            updateSettings({ googleCalendarConnected: false });
-            toast.error('Falha ao conectar com Google Calendar (simulado).');
-        }
-    }, 1500);
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    toast('Conectando com Google Calendar...', { icon: '🗓️', id: 'connecting-toast' });
+    const success = await connectGoogleCalendar();
+    toast.dismiss('connecting-toast');
+    if (success) {
+      toast.success('Google Calendar conectado!');
+    } else {
+      toast.error('Falha ao conectar com Google Calendar.');
+    }
+    setIsConnecting(false);
   };
-
-  const handleDisconnectGoogleCalendar = () => {
-    updateSettings({ googleCalendarConnected: false });
+  
+  const handleDisconnect = () => {
+    disconnectGoogleCalendar();
     toast('Google Calendar desconectado.', { icon: 'ℹ️' });
   };
 
@@ -73,7 +70,6 @@ const SettingsPage: React.FC = () => {
             toast.error('URL do Asaas inválida. Deve começar com http:// ou https://');
             return;
         }
-        // Google Drive URL validation removed
     } catch(e) {
         toast.error('Formato de URL inválido.');
         return;
@@ -82,12 +78,10 @@ const SettingsPage: React.FC = () => {
     updateSettings({
       customLogo: customLogoPreview,
       asaasUrl: asaasUrlInput || undefined, 
-      // googleDriveUrl: googleDriveUrlInput || undefined, // Removed
       userName: userNameInput || undefined,
       primaryColor: primaryColorInput,
       accentColor: accentColorInput,
       splashScreenBackgroundColor: splashBgColorInput,
-      // googleCalendarConnected is updated by its own handlers
     });
     toast.success('Configurações salvas com sucesso!');
   };
@@ -201,7 +195,6 @@ const SettingsPage: React.FC = () => {
             />
              <p className="text-xs text-text-secondary mt-1">Deixe em branco para usar a URL padrão.</p>
           </div>
-          {/* Google Drive URL input removed */}
         </div>
       </div>
 
@@ -213,7 +206,7 @@ const SettingsPage: React.FC = () => {
                 <div className="flex items-center gap-4">
                     <p className="text-green-600 font-medium">Conectado ao Google Calendar.</p>
                     <button 
-                        onClick={handleDisconnectGoogleCalendar}
+                        onClick={handleDisconnect}
                         className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition-colors text-sm"
                     >
                         Desconectar
@@ -221,10 +214,11 @@ const SettingsPage: React.FC = () => {
                 </div>
             ) : (
                 <button 
-                    onClick={handleConnectGoogleCalendar}
-                    className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-colors text-sm flex items-center"
+                    onClick={handleConnect}
+                    disabled={isConnecting}
+                    className="bg-accent text-white px-4 py-2 rounded-lg shadow hover:brightness-90 transition-colors text-sm flex items-center disabled:opacity-50"
                 >
-                   <CalendarIcon size={18} className="mr-2"/> Conectar com Google Calendar
+                   <CalendarIcon size={18} className="mr-2"/> {isConnecting ? 'Conectando...' : 'Conectar com Google Calendar'}
                 </button>
             )}
              <p className="text-xs text-text-secondary mt-2">

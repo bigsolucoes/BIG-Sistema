@@ -10,7 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { SendHorizonal } from 'lucide-react'; // Using SendHorizonal for send button
 
 const AIAssistantPage: React.FC = () => {
-  const { jobs, clients, loading: appDataLoading } = useAppData();
+  const { jobs, clients, calendarEvents, loading: appDataLoading } = useAppData();
   const [messages, setMessages] = useState<AIChatMessageType[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,13 +27,13 @@ const AIAssistantPage: React.FC = () => {
         setMessages([
             {
                 id: uuidv4(),
-                text: "Olá! Sou seu assistente de IA do BIG. Como posso ajudar a gerenciar seus projetos e finanças hoje?",
+                text: "Olá! Sou seu assistente de IA do BIG. Como posso ajudar a gerenciar seus projetos, finanças e calendário hoje?",
                 sender: 'ai',
                 timestamp: new Date().toISOString()
             }
         ]);
     }
-  }, [messages.length]); // Added messages.length to dependency array
+  }, [messages.length]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -53,6 +53,7 @@ const AIAssistantPage: React.FC = () => {
       const contextData = {
         jobs,
         clients,
+        calendarEvents,
       };
       
       const aiResponse = await callGeminiApi(input, contextData);
@@ -95,8 +96,8 @@ const AIAssistantPage: React.FC = () => {
   const exampleQuestions = [
     "Quanto eu faturei com a TechCorp Solutions este ano?",
     "Quais jobs de fotografia estão atrasados?",
-    "Liste todos os pagamentos que tenho a receber este mês.",
-    "Qual foi meu mês mais lucrativo nos últimos seis meses?",
+    "Quais são meus compromissos para amanhã?",
+    "Liste as entregas da próxima semana.",
     "Me dê um resumo do projeto 'Vídeo Promocional TechCorp'."
   ];
 

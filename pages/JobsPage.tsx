@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus, Client } from '../types';
@@ -25,11 +24,10 @@ const JobCard: React.FC<{
   client?: Client; 
   onClick: () => void;
   onDragStart: (e: React.DragEvent<HTMLDivElement>, jobId: string) => void;
-  onDragEnd: () => void;
   isDraggable: boolean;
   onArchive: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
-}> = ({ job, client, onClick, onDragStart, onDragEnd, isDraggable, onArchive, onDelete }) => {
+}> = ({ job, client, onClick, onDragStart, isDraggable, onArchive, onDelete }) => {
   const { settings } = useAppData();
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -44,13 +42,12 @@ const JobCard: React.FC<{
     <div 
       draggable={isDraggable}
       onDragStart={(e) => isDraggable && onDragStart(e, job.id)}
-      onDragEnd={onDragEnd}
-      className={`mb-3 rounded-lg shadow-md bg-card-bg hover:shadow-lg transition-all duration-200 
+      className={`mb-3 rounded-lg shadow-md bg-[#f9fcc5] hover:shadow-lg transition-all duration-200 
                   flex items-start gap-3 p-4
                   ${isDraggable ? 'cursor-grab active:cursor-grabbing' : 'opacity-80'}`}
     >
       {/* Left side action buttons */}
-      <div className="flex flex-col space-y-2 pt-1">
+      <div className="flex space-x-1 pt-1">
         <button 
           onClick={onArchive} 
           className="p-1 text-slate-500 hover:text-green-500 hover:bg-green-100 rounded-full transition-colors"
@@ -80,7 +77,7 @@ const JobCard: React.FC<{
           <p className="text-xs text-text-secondary mb-1">{client?.name || 'Cliente não encontrado'}</p>
           <p className="text-xs text-text-secondary mb-2">Valor: {formatCurrency(job.value, settings.privacyModeEnabled)}</p>
           <div className={`text-xs px-2 py-0.5 inline-block rounded-full mb-2 ${
-            isOverdue ? 'bg-red-100 text-red-700' : `bg-blue-100 text-accent`
+            isOverdue ? 'bg-red-100 text-red-700' : `bg-[#f0f3b4] text-yellow-900`
           }`}>
             Prazo: {formatDate(job.deadline)} {isOverdue && '(Atrasado)'}
           </div>
@@ -104,12 +101,11 @@ const KanbanColumn: React.FC<{
   clients: Client[]; 
   onJobCardClick: (job: Job) => void; 
   onDragStart: (e: React.DragEvent<HTMLDivElement>, jobId: string) => void;
-  onDragEnd: () => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>, targetStatus: JobStatus) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   onArchiveJob: (job: Job) => void;
   onDeleteJob: (jobId: string) => void;
-}> = ({ title, status, jobsInColumn, clients, onJobCardClick, onDragStart, onDragEnd, onDrop, onDragOver, onArchiveJob, onDeleteJob }) => {
+}> = ({ title, status, jobsInColumn, clients, onJobCardClick, onDragStart, onDrop, onDragOver, onArchiveJob, onDeleteJob }) => {
   
   const isPaidColumnTarget = status === JobStatus.PAID;
 
@@ -130,7 +126,6 @@ const KanbanColumn: React.FC<{
             client={clients.find(c => c.id === job.clientId)} 
             onClick={() => onJobCardClick(job)}
             onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
             isDraggable={true}
             onArchive={(e) => { e.stopPropagation(); onArchiveJob(job); }}
             onDelete={(e) => { e.stopPropagation(); onDeleteJob(job.id); }}
@@ -155,7 +150,6 @@ const JobsPage: React.FC = () => {
   const [selectedJobForPanel, setSelectedJobForPanel] = useState<Job | undefined>(undefined);
   const [isDetailsPanelOpen, setIsDetailsPanelOpen] = useState(false);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
 
   const activeJobs = useMemo(() => {
@@ -213,11 +207,6 @@ const JobsPage: React.FC = () => {
   
   const onDragStart = useCallback((e: React.DragEvent<HTMLDivElement>, jobId: string) => {
     e.dataTransfer.setData('jobId', jobId);
-    setIsDragging(true);
-  }, []);
-
-  const onDragEnd = useCallback(() => {
-    setIsDragging(false);
   }, []);
 
   const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>, targetStatus: JobStatus) => {
@@ -243,27 +232,6 @@ const JobsPage: React.FC = () => {
     e.preventDefault(); 
   }, []);
 
-  const handleDropOnArchive = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const jobId = e.dataTransfer.getData('jobId');
-    const jobToMove = jobs.find(j => j.id === jobId);
-    if (jobToMove) {
-        setJobForPaymentModal(jobToMove);
-        setPaymentModalOpen(true);
-    }
-    setIsDragging(false);
-  }, [jobs]);
-
-  const handleDropOnTrash = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const jobId = e.dataTransfer.getData('jobId');
-    const jobToMove = jobs.find(j => j.id === jobId);
-    if (jobToMove) {
-        handleDeleteClick(jobToMove.id);
-    }
-    setIsDragging(false);
-  }, [jobs, handleDeleteClick]);
-  
   const handlePaymentModalSuccess = () => {
     setPaymentModalOpen(false);
     if (jobForPaymentModal?.id === selectedJobForPanel?.id) {
@@ -348,7 +316,6 @@ const JobsPage: React.FC = () => {
                 clients={clients}
                 onJobCardClick={handleJobCardClick}
                 onDragStart={onDragStart}
-                onDragEnd={onDragEnd}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 onArchiveJob={handleArchiveClick}
@@ -373,33 +340,6 @@ const JobsPage: React.FC = () => {
             }}
             privacyModeEnabled={settings.privacyModeEnabled || false}
         />
-      )}
-
-      {/* Drop Zones */}
-      {isDragging && (
-        <>
-          <div 
-            onDrop={handleDropOnArchive}
-            onDragOver={onDragOver}
-            className="fixed bottom-5 left-5 z-20 w-48 h-24 bg-blue-100 border-2 border-dashed border-blue-500 rounded-lg flex items-center justify-center transition-all opacity-90 hover:scale-105 hover:shadow-xl"
-          >
-            <div className="text-center">
-              <ArchiveIcon className="mx-auto text-blue-500" size={24} />
-              <p className="text-blue-700 font-semibold mt-1">Arquivar</p>
-            </div>
-          </div>
-
-          <div 
-            onDrop={handleDropOnTrash}
-            onDragOver={onDragOver}
-            className="fixed bottom-5 right-5 z-20 w-48 h-24 bg-red-100 border-2 border-dashed border-red-500 rounded-lg flex items-center justify-center transition-all opacity-90 hover:scale-105 hover:shadow-xl"
-          >
-            <div className="text-center">
-              <TrashIcon className="mx-auto text-red-500" size={24} />
-              <p className="text-red-700 font-semibold mt-1">Lixeira</p>
-            </div>
-          </div>
-        </>
       )}
 
       {/* Modals and Panels */}

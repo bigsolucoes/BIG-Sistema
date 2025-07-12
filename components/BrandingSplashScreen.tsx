@@ -22,10 +22,10 @@ const BrandingSplashScreen: React.FC<BrandingSplashScreenProps> = ({ isFadingOut
       {!settingsLoading && (
         <>
           {settings.customLogo ? (
-            <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-24 max-h-48 max-w-xs object-contain animate-pulse" />
+            <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-32 max-h-48 max-w-xs object-contain animate-pulse" />
           ) : (
-            // Use text-accent for the text logo, it will pick up the user's chosen accent color
-            <h1 className={`text-7xl font-bold text-accent animate-pulse`}>{APP_NAME}</h1>
+            // Use text-white for the text logo for high contrast
+            <h1 className={`text-9xl font-bold text-white animate-pulse font-robuck tracking-wide`}>{APP_NAME}</h1>
           )}
         </>
       )}

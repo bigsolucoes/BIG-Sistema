@@ -1,15 +1,45 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppData } from '../../hooks/useAppData'; // To get settings for logo
-import { APP_NAME } from '../../constants';
+import { APP_NAME, BellIcon } from '../../constants';
 import toast from 'react-hot-toast';
+import Modal from '../../components/Modal';
+
+const ChangelogContent: React.FC = () => (
+  <div className="space-y-4 text-sm text-text-secondary max-h-[60vh] overflow-y-auto pr-2">
+    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+      <h3 className="font-semibold text-text-primary">Versão 2.1.0 (Atual)</h3>
+      <ul className="list-disc list-inside mt-1 space-y-1">
+        <li>Interface Monocromática: O aplicativo agora usa um tema em tons de cinza para um visual mais sóbrio e focado. Cores são usadas para alertas.</li>
+        <li>Fonte Robuck: A identidade visual "BIG" foi atualizada com a nova fonte.</li>
+        <li>Tela de Login: Adicionado alerta de novidades e design refinado.</li>
+      </ul>
+    </div>
+    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+      <h3 className="font-semibold text-text-primary">Versão 2.0.0</h3>
+      <ul className="list-disc list-inside mt-1 space-y-1">
+        <li>Novo Módulo de Rascunhos: Crie roteiros e anotações de texto diretamente no sistema.</li>
+        <li>Editor de Roteiro: Ferramenta para estruturar cenas, descrições e calcular a duração total do vídeo.</li>
+        <li>Anexos de Imagens: Adicione referências visuais aos seus rascunhos.</li>
+      </ul>
+    </div>
+    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+      <h3 className="font-semibold text-text-primary">Versão 1.5.0</h3>
+      <ul className="list-disc list-inside mt-1 space-y-1">
+        <li>Sistema de Autenticação: Introdução de login e registro de usuários para segurança dos dados.</li>
+        <li>Tela de Abertura: Nova animação de boas-vindas com a marca da aplicação.</li>
+      </ul>
+    </div>
+  </div>
+);
+
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState(''); // Changed from email
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isUpdatesModalOpen, setUpdatesModalOpen] = useState(false);
   const { login } = useAuth();
   const { settings } = useAppData(); // For logo
   const navigate = useNavigate();
@@ -31,14 +61,21 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+      <button
+        onClick={() => setUpdatesModalOpen(true)}
+        className="fixed top-4 right-4 p-3 bg-card-bg rounded-full shadow-lg hover:bg-slate-100 transition-colors z-10 text-accent hover:text-yellow-500"
+        title="Ver novidades e atualizações"
+      >
+        <BellIcon size={24} />
+      </button>
+
       <div className="w-full max-w-md">
         <div className="text-center mb-6 sm:mb-8">
           {settings.customLogo ? (
             <img src={settings.customLogo} alt={`${APP_NAME} Logo`} className="h-12 sm:h-16 mx-auto mb-2 object-contain" />
           ) : (
-            <h1 className="text-4xl sm:text-5xl font-bold text-accent mb-2">{APP_NAME}</h1>
+            <h1 className="text-6xl sm:text-7xl font-bold text-accent mb-2 font-robuck tracking-wide">{APP_NAME}</h1>
           )}
-          <h2 className="text-xl sm:text-2xl font-semibold text-text-primary">Bem-vindo de volta!</h2>
           <p className="text-text-secondary">Acesse sua conta para continuar.</p>
         </div>
 
@@ -87,6 +124,10 @@ const LoginPage: React.FC = () => {
       <footer className="text-center text-xs text-slate-500 mt-8 sm:mt-12">
         <p>&copy; {new Date().getFullYear()} {APP_NAME} Soluções. Todos os direitos reservados.</p>
       </footer>
+
+      <Modal isOpen={isUpdatesModalOpen} onClose={() => setUpdatesModalOpen(false)} title="Novidades e Atualizações" size="lg">
+        <ChangelogContent />
+      </Modal>
     </div>
   );
 };

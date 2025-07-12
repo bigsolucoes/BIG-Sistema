@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Client, Job } from '../types';
@@ -23,7 +24,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, jobs, onEdit, onDelete,
   const totalPaidByClient = clientJobs.reduce((sum, job) => sum + getJobPaymentSummary(job).totalPaid, 0);
 
   return (
-    <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col justify-between">
+    <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col justify-between border border-border-color">
       <div>
         <div className="flex justify-between items-start">
           <div>

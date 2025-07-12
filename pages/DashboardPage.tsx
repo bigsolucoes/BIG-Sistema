@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus, Payment } from '../types';
@@ -64,7 +65,7 @@ const DashboardPage: React.FC = () => {
 
   const jobStatusData = Object.entries(jobStatusCounts).map(([name, value]) => ({ name, value }));
   const COLORS = {
-    EmAndamento: '#007AFF', 
+    EmAndamento: '#94a3b8', // slate-400
     Atrasados: '#ef4444', 
     AguardandoAprovação: '#eab308', 
     AguardandoPagamento: '#f97316',
@@ -107,7 +108,7 @@ const DashboardPage: React.FC = () => {
   
   const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; isCurrency?: boolean; color?: string }> = 
     ({ title, value, icon, isCurrency = false, color = 'text-accent' }) => (
-    <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <div className="bg-card-bg p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border border-border-color">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-text-secondary font-medium">{title}</p>
@@ -115,7 +116,9 @@ const DashboardPage: React.FC = () => {
             {isCurrency ? formatCurrency(typeof value === 'number' ? value : parseFloat(value.toString()), settings.privacyModeEnabled) : value}
           </p>
         </div>
-        <div className={`p-3 rounded-full bg-opacity-20 ${color.startsWith('text-') ? `${color.replace('text-', 'bg-')} ${color}` : `bg-${color}-500 text-${color}-500`}`}>{icon}</div>
+        <div className={`p-3 rounded-full bg-slate-100 ${color}`}>
+          {icon}
+        </div>
       </div>
     </div>
   );
@@ -154,7 +157,7 @@ const DashboardPage: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card-bg p-6 rounded-xl shadow-lg">
+        <div className="bg-card-bg p-6 rounded-xl shadow-lg border border-border-color">
           <h2 className="text-xl font-semibold mb-4 text-text-primary">Status dos Jobs Ativos</h2>
           {jobStatusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -171,7 +174,7 @@ const DashboardPage: React.FC = () => {
           ) : <p className="text-text-secondary">Nenhum job ativo para exibir.</p>}
         </div>
 
-        <div className="bg-card-bg p-6 rounded-xl shadow-lg">
+        <div className="bg-card-bg p-6 rounded-xl shadow-lg border border-border-color">
           <h2 className="text-xl font-semibold mb-4 text-text-primary">Próximos Prazos</h2>
           {upcomingDeadlines.length > 0 ? (
             <ul className="space-y-3">
