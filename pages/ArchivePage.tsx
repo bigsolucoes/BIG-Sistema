@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, JobStatus } from '../types';
@@ -18,8 +19,10 @@ const ArchivePage: React.FC = () => {
     .filter(job => job.status === JobStatus.PAID && !job.isDeleted)
     .sort((a, b) => {
         try { // Sort by last payment date, most recent first
-            const lastPaymentA = Math.max(...a.payments.map(p => new Date(p.date).getTime()));
-            const lastPaymentB = Math.max(...b.payments.map(p => new Date(p.date).getTime()));
+            const paymentTimestampsA = a.payments.map(p => new Date(p.date).getTime()).filter(t => !isNaN(t));
+            const paymentTimestampsB = b.payments.map(p => new Date(p.date).getTime()).filter(t => !isNaN(t));
+            const lastPaymentA = paymentTimestampsA.length > 0 ? Math.max(...paymentTimestampsA) : 0;
+            const lastPaymentB = paymentTimestampsB.length > 0 ? Math.max(...paymentTimestampsB) : 0;
             return lastPaymentB - lastPaymentA;
         } catch { return 0; }
     });
@@ -74,9 +77,16 @@ const ArchivePage: React.FC = () => {
               <tbody className="bg-card-bg divide-y divide-border-color">
                 {archivedJobs.map((job) => {
                   const client = clients.find(c => c.id === job.clientId);
-                  const lastPaymentDate = job.payments.length > 0
-                    ? new Date(Math.max(...job.payments.map(p => new Date(p.date).getTime()))).toISOString()
-                    : 'N/A';
+                  
+                  const paymentTimestamps = job.payments
+                    .map(p => new Date(p.date).getTime())
+                    .filter(t => !isNaN(t));
+
+                  let lastPaymentDate: string | undefined;
+                  if (paymentTimestamps.length > 0) {
+                      lastPaymentDate = new Date(Math.max(...paymentTimestamps)).toISOString();
+                  }
+
                   return (
                     <tr key={job.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-primary">{job.name}</td>

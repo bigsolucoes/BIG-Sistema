@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -15,11 +14,11 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <HashRouter>
-      <AppDataProvider> {/* AppDataProvider should wrap AuthProvider if AuthProvider depends on AppData */}
-        <AuthProvider> {/* Or vice-versa depending on dependencies. Here, AuthProvider likely doesn't need AppData directly. */}
+      <AuthProvider>
+        <AppDataProvider>
           <App />
-        </AuthProvider>
-      </AppDataProvider>
+        </AppDataProvider>
+      </AuthProvider>
     </HashRouter>
   </React.StrictMode>
 );

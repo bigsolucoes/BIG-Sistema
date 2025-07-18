@@ -53,6 +53,8 @@ const DashboardPage: React.FC = () => {
           acc.AguardandoPagamento = (acc.AguardandoPagamento || 0) + 1;
         } else if (job.status === JobStatus.REVIEW) {
           acc.AguardandoAprovação = (acc.AguardandoAprovação || 0) + 1;
+        } else if (job.status === JobStatus.OTHER) {
+          acc.Outros = (acc.Outros || 0) + 1;
         }
          else { // BRIEFING, PRODUCTION
           acc.EmAndamento = (acc.EmAndamento || 0) + 1;
@@ -69,6 +71,7 @@ const DashboardPage: React.FC = () => {
     Atrasados: '#ef4444', 
     AguardandoAprovação: '#eab308', 
     AguardandoPagamento: '#f97316',
+    Outros: '#a855f7', // purple-500
   };
 
   const upcomingDeadlines = jobs
@@ -162,7 +165,7 @@ const DashboardPage: React.FC = () => {
           {jobStatusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
-                <Pie data={jobStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                <Pie isAnimationActive={true} animationDuration={500} data={jobStatusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
                   {jobStatusData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS] || '#8884d8'} />
                   ))}

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppData } from '../../hooks/useAppData';
 import { Job, Client, ServiceType, JobStatus } from '../../types';
-import { JOB_STATUS_OPTIONS, SERVICE_TYPE_OPTIONS, LinkIcon, RemoveLinkIcon, CalendarIcon, PlusCircleIcon } from '../../constants';
+import { JOB_STATUS_OPTIONS, SERVICE_TYPE_OPTIONS, LinkIcon, RemoveLinkIcon, CalendarIcon, SyncIcon } from '../../constants';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -23,6 +23,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
   const [cloudLinks, setCloudLinks] = useState<string[]>(['']);
   const [notes, setNotes] = useState('');
   const [createCalendarEvent, setCreateCalendarEvent] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   useEffect(() => {
     if (jobToEdit) {
@@ -32,14 +33,25 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       setValue(jobToEdit.value);
       setCost(jobToEdit.cost);
       try {
-        setDeadline(jobToEdit.deadline ? new Date(jobToEdit.deadline).toISOString().split('T')[0] : '');
+        if (jobToEdit.deadline) {
+            const d = new Date(jobToEdit.deadline);
+            if (!isNaN(d.getTime())) { // Check if date is valid
+                setDeadline(d.toISOString().split('T')[0]);
+            } else {
+                setDeadline('');
+            }
+        } else {
+            setDeadline('');
+        }
       } catch (e) {
-        setDeadline(''); toast.error("Erro ao carregar prazo.");
+        setDeadline(''); 
+        toast.error("Erro ao carregar prazo do job.");
       }
       setStatus(jobToEdit.status);
       setCloudLinks(jobToEdit.cloudLinks && jobToEdit.cloudLinks.length > 0 ? [...jobToEdit.cloudLinks, ''] : ['']);
       setNotes(jobToEdit.notes || '');
       setCreateCalendarEvent(jobToEdit.createCalendarEvent || false);
+      setIsRecurring(jobToEdit.isRecurring || false);
     } else {
       // Reset form for new job
       setName('');
@@ -52,6 +64,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       setCloudLinks(['']);
       setNotes('');
       setCreateCalendarEvent(false);
+      setIsRecurring(false);
     }
   }, [jobToEdit, clients]);
 
@@ -99,6 +112,7 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
       cloudLinks: finalCloudLinks.length > 0 ? finalCloudLinks : [],
       notes: notes || undefined,
       createCalendarEvent,
+      isRecurring,
     };
 
     if (jobToEdit) {
@@ -208,17 +222,31 @@ const JobForm: React.FC<JobFormProps> = ({ onSuccess, jobToEdit }) => {
         <textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={commonInputClass} placeholder="Detalhes adicionais sobre o job..."></textarea>
       </div>
 
-      <div className="flex items-center space-x-2 mt-2">
-        <input
-          type="checkbox"
-          id="createCalendarEvent"
-          checked={createCalendarEvent}
-          onChange={(e) => setCreateCalendarEvent(e.target.checked)}
-          className="h-4 w-4 text-accent border-border-color rounded focus:ring-accent"
-        />
-        <label htmlFor="createCalendarEvent" className="text-sm font-medium text-text-secondary flex items-center">
-            <CalendarIcon size={16} className="mr-1 text-accent" /> Criar evento no Google Calendar para o prazo
-        </label>
+      <div className="space-y-2">
+        <div className="flex items-center space-x-2">
+            <input
+            type="checkbox"
+            id="createCalendarEvent"
+            checked={createCalendarEvent}
+            onChange={(e) => setCreateCalendarEvent(e.target.checked)}
+            className="h-4 w-4 text-accent border-border-color rounded focus:ring-accent"
+            />
+            <label htmlFor="createCalendarEvent" className="text-sm font-medium text-text-secondary flex items-center">
+                <CalendarIcon size={16} className="mr-1 text-accent" /> Criar evento no Google Calendar para o prazo
+            </label>
+        </div>
+        <div className="flex items-center space-x-2">
+            <input
+            type="checkbox"
+            id="isRecurring"
+            checked={isRecurring}
+            onChange={(e) => setIsRecurring(e.target.checked)}
+            className="h-4 w-4 text-accent border-border-color rounded focus:ring-accent"
+            />
+            <label htmlFor="isRecurring" className="text-sm font-medium text-text-secondary flex items-center">
+                <SyncIcon size={16} className="mr-1 text-accent" /> Job Recorrente (cria um novo para o próximo mês ao ser finalizado)
+            </label>
+        </div>
       </div>
 
 

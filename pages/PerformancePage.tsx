@@ -1,6 +1,7 @@
 
 
 
+
 import React from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { Job, Client, ServiceType } from '../types';
@@ -160,7 +161,7 @@ const PerformancePage: React.FC = () => {
                 <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
-                <Bar dataKey="Receita" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receita" fill="#3b82f6" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={500} />
               </BarChart>
             </ResponsiveContainer>
           ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes.</p>}
@@ -175,9 +176,9 @@ const PerformancePage: React.FC = () => {
                 <YAxis tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <Tooltip formatter={currencyTooltipFormatter} />
                 <Legend wrapperStyle={{fontSize: "14px"}} />
-                <Line type="monotone" dataKey="Receita" stroke="#3b82f6" strokeWidth={2} />
-                <Line type="monotone" dataKey="Custo" stroke="#f43f5e" strokeWidth={2} />
-                <Line type="monotone" dataKey="Lucro" stroke="#22c55e" strokeWidth={3} />
+                <Line type="monotone" dataKey="Receita" stroke="#3b82f6" strokeWidth={2} isAnimationActive={true} animationDuration={500} />
+                <Line type="monotone" dataKey="Custo" stroke="#f43f5e" strokeWidth={2} isAnimationActive={true} animationDuration={500} />
+                <Line type="monotone" dataKey="Lucro" stroke="#22c55e" strokeWidth={3} isAnimationActive={true} animationDuration={500} />
               </LineChart>
             </ResponsiveContainer>
           ) : <p className="text-text-secondary text-center pt-10">Dados insuficientes (requer custos nos jobs).</p>}
@@ -188,6 +189,8 @@ const PerformancePage: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie 
+                    isAnimationActive={true}
+                    animationDuration={500}
                     data={serviceCosts} 
                     dataKey="value" 
                     nameKey="name" 
@@ -215,7 +218,7 @@ const PerformancePage: React.FC = () => {
                 <XAxis type="number" tickFormatter={currencyAxisTickFormatter} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <YAxis type="category" dataKey="name" width={100} tick={{ fill: '#64748b', fontSize: 11 }} />
                 <Tooltip formatter={(value: number) => formatCurrency(value, privacyMode)} />
-                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} isAnimationActive={true} animationDuration={500}>
                     {serviceRevenue.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}

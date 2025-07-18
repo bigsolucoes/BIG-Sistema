@@ -82,6 +82,7 @@ export const JOB_STATUS_OPTIONS = [
   { value: JobStatus.BRIEFING, label: 'Briefing' },
   { value: JobStatus.PRODUCTION, label: 'Produção' },
   { value: JobStatus.REVIEW, label: 'Revisão' },
+  { value: JobStatus.OTHER, label: 'Outros' },
   { value: JobStatus.FINALIZED, label: 'Finalizado' },
   { value: JobStatus.PAID, label: 'Pago' },
 ];
@@ -102,6 +103,7 @@ export const KANBAN_COLUMNS = [
   { id: 'BRIEFING', title: 'Briefing', status: JobStatus.BRIEFING },
   { id: 'PRODUCTION', title: 'Produção', status: JobStatus.PRODUCTION },
   { id: 'REVIEW', title: 'Revisão', status: JobStatus.REVIEW },
+  { id: 'OTHER', title: 'Outros', status: JobStatus.OTHER },
   { id: 'FINALIZED', title: 'Finalizado', status: JobStatus.FINALIZED },
   { id: 'PAID', title: 'Pago / Registrar Pagamento', status: JobStatus.PAID }, // Title indicates action or final state
 ];

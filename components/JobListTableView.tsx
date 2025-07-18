@@ -18,6 +18,7 @@ const getStatusClass = (status: JobStatus) => {
     case JobStatus.REVIEW: return 'bg-yellow-100 text-yellow-700';
     case JobStatus.PRODUCTION: return 'bg-indigo-100 text-indigo-700';
     case JobStatus.BRIEFING: return 'bg-slate-100 text-slate-700';
+    case JobStatus.OTHER: return 'bg-purple-100 text-purple-700';
     default: return 'bg-gray-100 text-gray-700';
   }
 };

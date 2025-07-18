@@ -79,6 +79,7 @@ const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
         case JobStatus.BRIEFING: return 'bg-slate-200 text-slate-700';
         case JobStatus.PRODUCTION: return 'bg-indigo-200 text-indigo-700';
         case JobStatus.REVIEW: return 'bg-yellow-200 text-yellow-700';
+        case JobStatus.OTHER: return 'bg-purple-200 text-purple-700';
         case JobStatus.FINALIZED: return 'bg-blue-200 text-blue-700';
         case JobStatus.PAID: return 'bg-green-200 text-green-700';
         default: return 'bg-gray-200 text-gray-700';

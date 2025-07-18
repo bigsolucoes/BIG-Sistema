@@ -17,6 +17,7 @@ export enum JobStatus {
   REVIEW = 'Revisão',
   FINALIZED = 'Finalizado',
   PAID = 'Pago',
+  OTHER = 'Outros',
 }
 
 export interface Client {
@@ -61,6 +62,7 @@ export interface Job {
   payments: Payment[]; // Replaces all old payment fields
   createCalendarEvent?: boolean; // For Google Calendar integration
   calendarEventId?: string; // ID of the event created in the calendar
+  isRecurring?: boolean;
 }
 
 export enum FinancialJobStatus {

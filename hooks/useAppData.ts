@@ -1,12 +1,24 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Job, Client, AppSettings, JobObservation, DraftNote, Payment, CalendarEvent } from '../types';
+import { Job, Client, AppSettings, JobObservation, DraftNote, Payment, CalendarEvent, JobStatus } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import toast from 'react-hot-toast';
+import { useAuth } from './useAuth';
 
 // Default theme colors
 const DEFAULT_PRIMARY_COLOR = '#f8fafc'; // slate-50
 const DEFAULT_ACCENT_COLOR = '#1e293b'; // slate-800
 const DEFAULT_SPLASH_BACKGROUND_COLOR = '#111827'; // Dark Slate (e.g., gray-900)
+
+const defaultInitialSettings: AppSettings = {
+  customLogo: undefined,
+  asaasUrl: 'https://www.asaas.com/login',
+  userName: '',
+  primaryColor: DEFAULT_PRIMARY_COLOR,
+  accentColor: DEFAULT_ACCENT_COLOR,
+  splashScreenBackgroundColor: DEFAULT_SPLASH_BACKGROUND_COLOR,
+  privacyModeEnabled: false,
+  googleCalendarConnected: false,
+};
 
 
 interface AppDataContextType {
@@ -15,7 +27,7 @@ interface AppDataContextType {
   draftNotes: DraftNote[];
   settings: AppSettings;
   calendarEvents: CalendarEvent[];
-  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost'>>) => void;
+  addJob: (job: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost' | 'isRecurring'>>) => void;
   updateJob: (job: Job) => void;
   deleteJob: (jobId: string) => void; // Soft delete
   permanentlyDeleteJob: (jobId: string) => void; // Hard delete
@@ -36,35 +48,28 @@ interface AppDataContextType {
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
-const initialJobs: Job[] = [];
-const initialClients: Client[] = [
+// These will be used only for the FIRST time a user logs in.
+const initialClientsForNewUser: Client[] = [
     { id: 'client1', name: 'Ana Silva', company: 'TechCorp Solutions', email: 'ana.silva@techcorp.com', phone: '11987654321', createdAt: new Date().toISOString(), cpf: '111.222.333-44', observations: 'Prefere comunicação por email.' },
-    { id: 'client2', name: 'Carlos Pereira', company: 'Urban Style Agency', email: 'carlos.p@urbanstyle.com', createdAt: new Date().toISOString() },
-    { id: 'client3', name: 'Juliana Costa', company: 'NatureFoods Inc.', email: 'juliana.costa@naturefoods.com', phone: '21912345678', createdAt: new Date().toISOString(), observations: 'Pagamento sempre em dia.' },
 ];
-const initialDraftNotes: DraftNote[] = [
+const initialDraftNotesForNewUser: DraftNote[] = [
     {id: uuidv4(), title: "Exemplo de Roteiro", type: 'SCRIPT', content: "", scriptLines: [{id: uuidv4(), scene: "1", description: "CENA DE ABERTURA: Um dia ensolarado no parque.", duration: 15}], attachments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()},
 ];
 
-const initialSettings: AppSettings = {
-  customLogo: undefined,
-  asaasUrl: 'https://www.asaas.com/login',
-  userName: '',
-  primaryColor: DEFAULT_PRIMARY_COLOR,
-  accentColor: DEFAULT_ACCENT_COLOR,
-  splashScreenBackgroundColor: DEFAULT_SPLASH_BACKGROUND_COLOR,
-  privacyModeEnabled: false,
-  googleCalendarConnected: false,
-};
-
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [draftNotes, setDraftNotes] = useState<DraftNote[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(initialSettings);
+  const [settings, setSettings] = useState<AppSettings>(defaultInitialSettings);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  const getUserDataKey = useCallback((baseKey: string) => {
+    if (!currentUser) return null;
+    return `big_${baseKey}_${currentUser.id}`;
+  }, [currentUser]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-main-bg', settings.primaryColor || DEFAULT_PRIMARY_COLOR);
@@ -73,79 +78,119 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     document.documentElement.style.setProperty('--color-input-focus-border', currentAccentColor);
   }, [settings.primaryColor, settings.accentColor]);
 
+  // Main data loading effect, triggered by user change
   useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      setJobs([]);
+      setClients([]);
+      setDraftNotes([]);
+      setSettings(defaultInitialSettings);
+      setCalendarEvents([]);
+      return;
+    }
+    
+    setLoading(true);
     try {
-      const storedJobs = localStorage.getItem('big_jobs');
-      const storedClients = localStorage.getItem('big_clients');
-      const storedDrafts = localStorage.getItem('big_draftNotes');
-      const storedSettings = localStorage.getItem('big_settings');
-      const storedCalendarEvents = localStorage.getItem('big_calendarEvents');
+      const jobsKey = getUserDataKey('jobs');
+      const clientsKey = getUserDataKey('clients');
+      const draftsKey = getUserDataKey('draftNotes');
+      const settingsKey = getUserDataKey('settings');
+      const calendarKey = getUserDataKey('calendarEvents');
 
-      let parsedJobs = storedJobs ? JSON.parse(storedJobs) : initialJobs;
-      const migratedJobs = parsedJobs.map((job: any): Job => {
-        // Migration logic here...
-        return {
-          ...job,
-          id: job.id || uuidv4(),
-          isDeleted: job.isDeleted ?? false,
-          observationsLog: job.observationsLog || [],
-          cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []),
-          createCalendarEvent: job.createCalendarEvent ?? false,
-          cost: job.cost ?? undefined,
-          payments: job.payments || [],
-          calendarEventId: job.calendarEventId,
-        };
-      });
+      if(!jobsKey || !clientsKey || !draftsKey || !settingsKey || !calendarKey) {
+        throw new Error("User key not available");
+      }
+
+      const storedJobs = localStorage.getItem(jobsKey);
+      const storedClients = localStorage.getItem(clientsKey);
+      const storedDrafts = localStorage.getItem(draftsKey);
+      const storedSettings = localStorage.getItem(settingsKey);
+      const storedCalendarEvents = localStorage.getItem(calendarKey);
+
+      // Onboard new user with default data if they have no stored data
+      const isNewUser = !storedJobs && !storedClients && !storedDrafts && !storedSettings;
+
+      // Load Jobs
+      const parsedJobs = storedJobs ? JSON.parse(storedJobs) : [];
+      const migratedJobs = parsedJobs.map((job: any): Job => ({
+        ...job, id: job.id || uuidv4(), isDeleted: job.isDeleted ?? false, observationsLog: job.observationsLog || [], cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []), createCalendarEvent: job.createCalendarEvent ?? false, cost: job.cost ?? undefined, payments: job.payments || [], calendarEventId: job.calendarEventId, isRecurring: job.isRecurring ?? false,
+      }));
       setJobs(migratedJobs);
 
-      setClients(storedClients ? JSON.parse(storedClients) : initialClients);
+      // Load Clients
+      setClients(isNewUser ? initialClientsForNewUser : (storedClients ? JSON.parse(storedClients) : []));
       
-      const parsedDrafts = storedDrafts ? JSON.parse(storedDrafts) : initialDraftNotes;
+      // Load Drafts
+      const parsedDrafts = isNewUser ? initialDraftNotesForNewUser : (storedDrafts ? JSON.parse(storedDrafts) : []);
       setDraftNotes(parsedDrafts.map((draft: any): DraftNote => ({
-        ...draft, type: draft.type || 'SCRIPT', scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), content: draft.content || '', attachments: draft.attachments || [], imageBase64: undefined, imageMimeType: undefined,
+        ...draft, type: draft.type || 'SCRIPT', scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), content: draft.content || '', attachments: draft.attachments || [],
       })));
       
-      const loadedSettings = storedSettings ? JSON.parse(storedSettings) : initialSettings;
+      // Load Settings
+      const loadedSettings = storedSettings ? JSON.parse(storedSettings) : defaultInitialSettings;
       setSettings({
-        primaryColor: loadedSettings.primaryColor || DEFAULT_PRIMARY_COLOR,
-        accentColor: loadedSettings.accentColor || DEFAULT_ACCENT_COLOR,
-        splashScreenBackgroundColor: loadedSettings.splashScreenBackgroundColor || DEFAULT_SPLASH_BACKGROUND_COLOR,
-        customLogo: loadedSettings.customLogo,
-        asaasUrl: loadedSettings.asaasUrl || 'https://www.asaas.com/login',
-        userName: loadedSettings.userName || '',
-        privacyModeEnabled: loadedSettings.privacyModeEnabled ?? false,
-        googleCalendarConnected: loadedSettings.googleCalendarConnected ?? false,
-        googleCalendarLastSync: loadedSettings.googleCalendarLastSync,
+        ...defaultInitialSettings,
+        ...loadedSettings,
+        userName: loadedSettings.userName || currentUser.username, // Default to auth username
       });
 
+      // Load Calendar Events
       setCalendarEvents(storedCalendarEvents ? JSON.parse(storedCalendarEvents) : []);
 
     } catch (error) {
-      console.error("Failed to load or migrate data from localStorage", error);
-      setJobs([]); setClients(initialClients); setDraftNotes(initialDraftNotes); setSettings(initialSettings); setCalendarEvents([]);
+      console.error("Failed to load or migrate data from localStorage for user", currentUser.id, error);
+      setJobs([]); setClients([]); setDraftNotes([]); setSettings(defaultInitialSettings); setCalendarEvents([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser, getUserDataKey]);
 
-  useEffect(() => { if (!loading) { localStorage.setItem('big_jobs', JSON.stringify(jobs)); } }, [jobs, loading]);
-  useEffect(() => { if(!loading) { localStorage.setItem('big_clients', JSON.stringify(clients)); } }, [clients, loading]);
-  useEffect(() => { if(!loading) { localStorage.setItem('big_draftNotes', JSON.stringify(draftNotes)); } }, [draftNotes, loading]);
-  useEffect(() => { if(!loading) { localStorage.setItem('big_settings', JSON.stringify(settings)); } }, [settings, loading]);
-  useEffect(() => { if(!loading) { localStorage.setItem('big_calendarEvents', JSON.stringify(calendarEvents)); } }, [calendarEvents, loading]);
+  // Data saving effects, now user-specific
+  useEffect(() => { const key = getUserDataKey('jobs'); if (!loading && key) localStorage.setItem(key, JSON.stringify(jobs)); }, [jobs, loading, getUserDataKey]);
+  useEffect(() => { const key = getUserDataKey('clients'); if (!loading && key) localStorage.setItem(key, JSON.stringify(clients)); }, [clients, loading, getUserDataKey]);
+  useEffect(() => { const key = getUserDataKey('draftNotes'); if (!loading && key) localStorage.setItem(key, JSON.stringify(draftNotes)); }, [draftNotes, loading, getUserDataKey]);
+  useEffect(() => { const key = getUserDataKey('settings'); if (!loading && key) localStorage.setItem(key, JSON.stringify(settings)); }, [settings, loading, getUserDataKey]);
+  useEffect(() => { const key = getUserDataKey('calendarEvents'); if (!loading && key) localStorage.setItem(key, JSON.stringify(calendarEvents)); }, [calendarEvents, loading, getUserDataKey]);
 
 
- const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost'>>) => {
+ const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost' | 'isRecurring'>>) => {
     const newJob: Job = {
         ...jobData,
-        id: uuidv4(), createdAt: new Date().toISOString(), isDeleted: false, observationsLog: [], payments: [], cloudLinks: jobData.cloudLinks || [], createCalendarEvent: jobData.createCalendarEvent || false,
+        id: uuidv4(), createdAt: new Date().toISOString(), isDeleted: false, observationsLog: [], payments: [], cloudLinks: jobData.cloudLinks || [], createCalendarEvent: jobData.createCalendarEvent || false, isRecurring: jobData.isRecurring || false,
     };
     setJobs(prev => [...prev, newJob]);
   }, []);
 
   const updateJob = useCallback((updatedJob: Job) => {
-    setJobs(prev => prev.map(job => job.id === updatedJob.id ? updatedJob : job));
-  }, []);
+    const previousJob = jobs.find(j => j.id === updatedJob.id);
+
+    if (previousJob && previousJob.status !== JobStatus.PAID && updatedJob.status === JobStatus.PAID && updatedJob.isRecurring) {
+        setJobs(prevJobs => {
+            const deadlineDate = new Date(updatedJob.deadline);
+            deadlineDate.setMonth(deadlineDate.getMonth() + 1);
+
+            const newRecurringJob: Job = {
+                ...updatedJob,
+                id: uuidv4(),
+                createdAt: new Date().toISOString(),
+                deadline: deadlineDate.toISOString(),
+                status: JobStatus.BRIEFING, 
+                payments: [],
+                observationsLog: [],
+                calendarEventId: undefined, 
+                name: `${updatedJob.name.replace(/ \(Mês Seguinte\)$/i, '')}`,
+            };
+
+            toast.success(`Job recorrente "${newRecurringJob.name}" criado para o próximo mês.`);
+            
+            return [...prevJobs.map(job => job.id === updatedJob.id ? updatedJob : job), newRecurringJob];
+        });
+    } else {
+        setJobs(prev => prev.map(job => job.id === updatedJob.id ? updatedJob : job));
+    }
+}, [jobs]);
+
 
   const deleteJob = useCallback((jobId: string) => { setJobs(prev => prev.map(job => job.id === jobId ? { ...job, isDeleted: true } : job)); }, []);
   const permanentlyDeleteJob = useCallback((jobId: string) => { setJobs(prev => prev.filter(job => job.id !== jobId)); }, []);
@@ -168,14 +213,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     let allEvents = [...calendarEvents];
     let jobsToUpdate: Job[] = [];
 
-    // Simulate fetching some events from Google Calendar
-    const googleEvents: CalendarEvent[] = [
-        { id: 'gcal_1', title: 'Reunião de Alinhamento', start: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(), end: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(), allDay: false, source: 'google' },
-        { id: 'gcal_2', title: 'Aniversário Cliente X', start: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(), end: new Date(new Date().setDate(new Date().getDate() - 5)).toISOString(), allDay: true, source: 'google' }
-    ];
+    const googleEvents: CalendarEvent[] = []; // In real app, fetch from Google API
     allEvents = allEvents.filter(e => e.source !== 'google').concat(googleEvents);
     
-    // Sync BIG jobs to calendar
     const jobsWithCalendarRequest = jobs.filter(j => !j.isDeleted && j.createCalendarEvent);
     const existingEventJobIds = new Set(allEvents.filter(e => e.source === 'big').map(e => e.jobId));
     
@@ -190,14 +230,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
     });
 
-    // Remove events for jobs that no longer exist or have the flag unchecked
     const jobIdsWithRequest = new Set(jobsWithCalendarRequest.map(j => j.id));
-    allEvents = allEvents.filter(event => {
-        if (event.source === 'big') {
-            return jobIdsWithRequest.has(event.jobId);
-        }
-        return true;
-    });
+    allEvents = allEvents.filter(event => !(event.source === 'big' && !jobIdsWithRequest.has(event.jobId)));
 
     setCalendarEvents(allEvents);
     if(jobsToUpdate.length > 0){
@@ -211,7 +245,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (settings.googleCalendarConnected && !loading) {
             syncCalendar();
         }
-    }, 500); // Debounce sync
+    }, 500);
     return () => clearTimeout(syncTimeout);
   }, [jobs, settings.googleCalendarConnected, loading, syncCalendar]);
 
@@ -219,7 +253,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     await new Promise(resolve => setTimeout(resolve, 1500));
     const success = Math.random() > 0.2;
     if (success) {
-      updateSettings({ googleCalendarConnected: true });
+      updateSettings({ googleCalendarConnected: true, googleCalendarLastSync: new Date().toISOString() });
       return true;
     }
     return false;

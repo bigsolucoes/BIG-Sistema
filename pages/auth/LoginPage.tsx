@@ -56,6 +56,18 @@ const LoginPage: React.FC = () => {
       toast.error('Falha no login. Verifique seu usuário e senha.'); // Updated error message
     }
   };
+
+  const handleAdminLogin = async () => {
+    setIsLoading(true);
+    const success = await login('admin', 'admin');
+    setIsLoading(false);
+    if (success) {
+      toast.success('Login de administrador bem-sucedido!');
+      navigate('/dashboard');
+    } else {
+      toast.error('Falha no login de administrador.');
+    }
+  };
   
   const commonInputClass = "w-full px-4 py-3 border border-border-color rounded-lg shadow-sm focus:ring-2 focus:ring-accent focus:border-transparent outline-none transition-shadow bg-card-bg text-text-primary placeholder-text-secondary";
 
@@ -113,12 +125,22 @@ const LoginPage: React.FC = () => {
           >
             {isLoading ? 'Entrando...' : 'Entrar'}
           </button>
-          <p className="text-center text-sm text-text-secondary">
-            Não tem uma conta?{' '}
-            <Link to="/register" className="font-medium text-accent hover:underline">
-              Registrar-se
-            </Link>
-          </p>
+          <div className="space-y-2 text-center">
+             <p className="text-sm text-text-secondary">
+                Não tem uma conta?{' '}
+                <Link to="/register" className="font-medium text-accent hover:underline">
+                Registrar-se
+                </Link>
+            </p>
+             <button
+                type="button"
+                onClick={handleAdminLogin}
+                disabled={isLoading}
+                className="w-full bg-slate-600 text-white py-2 px-4 rounded-lg shadow-sm hover:bg-slate-700 transition-colors text-sm disabled:opacity-70"
+             >
+                Entrar como Admin (Beta)
+            </button>
+          </div>
         </form>
       </div>
       <footer className="text-center text-xs text-slate-500 mt-8 sm:mt-12">
