@@ -9,14 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.6.0",
+    "@vercel/blob": "^1.1.1",
+    "lucide-react": "^0.400.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.2",
     "react-hot-toast": "^2.5.2",
-    "uuid": "^11.1.0",
+    "react-router-dom": "^7.6.2",
     "recharts": "^3.0.0",
-    "@google/genai": "^1.6.0",
-    "lucide-react": "^0.400.0"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
