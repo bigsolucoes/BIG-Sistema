@@ -1,7 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types'; // Assuming User type is defined
 import { v4 as uuidv4 } from 'uuid';
 import { useNavigate } from 'react-router-dom';
+import * as blobService from '../services/blobStorageService';
 
 // NOTE: This is a basic prototype authentication.
 // DO NOT use localStorage for sensitive data like passwords in production.
@@ -16,6 +18,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SYSTEM_USER_ID = 'system_data'; // A fixed ID for non-user-specific data like the user list.
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -23,7 +26,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for logged-in user in localStorage on initial load
+    // Check for logged-in user in localStorage on initial load. This is session state, not DB.
     try {
       const storedUser = localStorage.getItem('big_currentUser');
       if (storedUser) {
@@ -47,15 +50,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return true;
     }
 
-    // Simulate API call / password check for regular users
     try {
-      const storedUsersRaw = localStorage.getItem('big_users');
-      const storedUsers: User[] = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
-      
-      const foundUser = storedUsers.find(u => u.username.toLowerCase() === username.toLowerCase());
+      const storedUsers = await blobService.get<User[]>(SYSTEM_USER_ID, 'users');
+      const users = storedUsers || [];
+      const foundUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
 
       // Simulate password check (highly insecure, for prototype only)
-      const storedUserPass = localStorage.getItem(`big_user_pass_${username.toLowerCase()}`);
+      const storedUserPass = await blobService.get<string>(SYSTEM_USER_ID, `user_pass_${username.toLowerCase()}`);
 
       if (foundUser && storedUserPass === pass) {
         const sessionUser: User = { id: foundUser.id, username: foundUser.username };
@@ -79,19 +80,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return false; 
     }
     try {
-      const storedUsersRaw = localStorage.getItem('big_users');
-      const storedUsers: User[] = storedUsersRaw ? JSON.parse(storedUsersRaw) : [];
+      const storedUsers = await blobService.get<User[]>(SYSTEM_USER_ID, 'users');
+      const users = storedUsers || [];
       
-      if (storedUsers.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
         setLoading(false);
         return false; // User already exists
       }
       
-      const newUser: User = { id: uuidv4(), username: username }; // Store username as provided (case-sensitive for display, but compare lowercase)
-      storedUsers.push(newUser);
-      localStorage.setItem('big_users', JSON.stringify(storedUsers));
+      const newUser: User = { id: uuidv4(), username: username };
+      const updatedUsers = [...users, newUser];
+      
+      await blobService.set(SYSTEM_USER_ID, 'users', updatedUsers);
       // Store plain password for prototype login check - EXTREMELY INSECURE
-      localStorage.setItem(`big_user_pass_${username.toLowerCase()}`, pass);
+      await blobService.set(SYSTEM_USER_ID, `user_pass_${username.toLowerCase()}`, pass);
 
       // Automatically log in the new user
       const sessionUser: User = { id: newUser.id, username: newUser.username };

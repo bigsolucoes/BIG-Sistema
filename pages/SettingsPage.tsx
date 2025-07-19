@@ -1,12 +1,20 @@
 
-import React, { useState, useEffect, ChangeEvent } from 'react';
+import React, { useState, useEffect, ChangeEvent, useRef } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import toast from 'react-hot-toast';
-import { APP_NAME, SettingsIcon as PageIcon, CalendarIcon, LinkIcon } from '../constants'; // PageIcon, CalendarIcon, LinkIcon
+import { APP_NAME, SettingsIcon as PageIcon, CalendarIcon, LinkIcon, DownloadIcon, UploadIcon } from '../constants'; // PageIcon, CalendarIcon, LinkIcon
 import LoadingSpinner from '../components/LoadingSpinner'; 
 
 const SettingsPage: React.FC = () => {
-  const { settings, updateSettings, loading, connectGoogleCalendar, disconnectGoogleCalendar } = useAppData();
+  const { 
+    settings, 
+    updateSettings, 
+    loading, 
+    connectGoogleCalendar, 
+    disconnectGoogleCalendar,
+    exportData,
+    importData
+  } = useAppData();
   
   const [isConnecting, setIsConnecting] = useState(false);
   const [customLogoPreview, setCustomLogoPreview] = useState<string | undefined>(settings.customLogo);
@@ -15,6 +23,7 @@ const SettingsPage: React.FC = () => {
   const [primaryColorInput, setPrimaryColorInput] = useState(settings.primaryColor || '#f8fafc');
   const [accentColorInput, setAccentColorInput] = useState(settings.accentColor || '#1e293b');
   const [splashBgColorInput, setSplashBgColorInput] = useState(settings.splashScreenBackgroundColor || '#111827');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -96,6 +105,40 @@ const SettingsPage: React.FC = () => {
     return url.protocol === "http:" || url.protocol === "https:";
   }
   
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (file.type !== 'application/json') {
+          toast.error("Por favor, selecione um arquivo .json válido.");
+          return;
+      }
+      
+      if (!window.confirm("Atenção: A importação de dados substituirá TODOS os dados atuais (jobs, clientes, configurações, etc.). Esta ação não pode ser desfeita. Deseja continuar?")) {
+          // Clear the file input so the same file can be selected again
+          if (event.target) event.target.value = '';
+          return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+          const text = e.target?.result;
+          if (typeof text === 'string') {
+              await importData(text);
+          }
+      };
+      reader.onerror = () => {
+          toast.error("Falha ao ler o arquivo.");
+      };
+      reader.readAsText(file);
+      
+      if (event.target) event.target.value = '';
+  };
+
   const commonInputClass = "w-full p-2 border border-border-color rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-text-primary outline-none transition-shadow bg-card-bg";
   const sectionCardClass = "bg-card-bg p-6 rounded-xl shadow-lg";
   const colorInputClass = "p-1 h-10 w-full border border-border-color rounded-md cursor-pointer";
@@ -224,6 +267,44 @@ const SettingsPage: React.FC = () => {
              <p className="text-xs text-text-secondary mt-2">
                 Permite criar eventos no seu Google Calendar para prazos de jobs.
             </p>
+        </div>
+      </div>
+
+      <div className={sectionCardClass}>
+        <h2 className="text-xl font-semibold text-text-primary mb-4">Backup e Restauração</h2>
+        <div className="space-y-6">
+            <div>
+                <h3 className="text-lg font-medium text-text-primary">Exportar Dados</h3>
+                <p className="text-sm text-text-secondary mt-1 mb-2">Crie um backup de todos os seus dados. Salve este arquivo em um local seguro.</p>
+                <button
+                    onClick={exportData}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
+                >
+                    <DownloadIcon size={18} className="mr-2" />
+                    Exportar meus dados
+                </button>
+            </div>
+            <div className="border-t border-border-color"></div>
+            <div>
+                <h3 className="text-lg font-medium text-text-primary">Importar Dados</h3>
+                <p className="text-sm text-text-secondary mt-1 mb-2">
+                    <span className="font-bold text-red-500">Atenção:</span> Isto substituirá todos os dados existentes no aplicativo. Use com cuidado.
+                </p>
+                <button
+                    onClick={handleImportClick}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg shadow transition-colors text-sm flex items-center"
+                >
+                    <UploadIcon size={18} className="mr-2" />
+                    Importar de um arquivo
+                </button>
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".json"
+                    className="hidden"
+                />
+            </div>
         </div>
       </div>
       

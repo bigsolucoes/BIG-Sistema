@@ -1,8 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Job, Client, AppSettings, JobObservation, DraftNote, Payment, CalendarEvent, JobStatus } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { useAuth } from './useAuth';
+import * as blobService from '../services/blobStorageService';
 
 // Default theme colors
 const DEFAULT_PRIMARY_COLOR = '#f8fafc'; // slate-50
@@ -43,6 +45,8 @@ interface AppDataContextType {
   connectGoogleCalendar: () => Promise<boolean>;
   disconnectGoogleCalendar: () => void;
   syncCalendar: () => void;
+  exportData: () => void;
+  importData: (jsonData: string) => Promise<boolean>;
   loading: boolean;
 }
 
@@ -65,11 +69,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [settings, setSettings] = useState<AppSettings>(defaultInitialSettings);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  
-  const getUserDataKey = useCallback((baseKey: string) => {
-    if (!currentUser) return null;
-    return `big_${baseKey}_${currentUser.id}`;
-  }, [currentUser]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-main-bg', settings.primaryColor || DEFAULT_PRIMARY_COLOR);
@@ -90,68 +89,63 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       return;
     }
     
-    setLoading(true);
-    try {
-      const jobsKey = getUserDataKey('jobs');
-      const clientsKey = getUserDataKey('clients');
-      const draftsKey = getUserDataKey('draftNotes');
-      const settingsKey = getUserDataKey('settings');
-      const calendarKey = getUserDataKey('calendarEvents');
+    const loadUserData = async () => {
+      setLoading(true);
+      try {
+        const [storedJobs, storedClients, storedDrafts, storedSettings, storedCalendarEvents] = await Promise.all([
+          blobService.get<Job[]>(currentUser.id, 'jobs'),
+          blobService.get<Client[]>(currentUser.id, 'clients'),
+          blobService.get<DraftNote[]>(currentUser.id, 'draftNotes'),
+          blobService.get<AppSettings>(currentUser.id, 'settings'),
+          blobService.get<CalendarEvent[]>(currentUser.id, 'calendarEvents'),
+        ]);
 
-      if(!jobsKey || !clientsKey || !draftsKey || !settingsKey || !calendarKey) {
-        throw new Error("User key not available");
+        const isNewUser = !storedJobs && !storedClients && !storedDrafts && !storedSettings;
+
+        const parsedJobs = storedJobs || [];
+        const migratedJobs = parsedJobs.map((job: any): Job => ({
+          ...job, id: job.id || uuidv4(), isDeleted: job.isDeleted ?? false, observationsLog: job.observationsLog || [], cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []), createCalendarEvent: job.createCalendarEvent ?? false, cost: job.cost ?? undefined, payments: job.payments || [], calendarEventId: job.calendarEventId, isRecurring: job.isRecurring ?? false,
+        }));
+        setJobs(migratedJobs);
+
+        setClients(isNewUser ? initialClientsForNewUser : (storedClients || []));
+        
+        const parsedDrafts = isNewUser ? initialDraftNotesForNewUser : (storedDrafts || []);
+        setDraftNotes(parsedDrafts.map((draft: any): DraftNote => ({
+          ...draft, type: draft.type || 'SCRIPT', scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), content: draft.content || '', attachments: draft.attachments || [],
+        })));
+        
+        const loadedSettings = storedSettings || defaultInitialSettings;
+        setSettings({
+          ...defaultInitialSettings,
+          ...loadedSettings,
+          userName: loadedSettings.userName || currentUser.username,
+        });
+
+        setCalendarEvents(storedCalendarEvents || []);
+
+      } catch (error) {
+        console.error("Failed to load or migrate data from blob storage for user", currentUser.id, error);
+        setJobs([]); setClients([]); setDraftNotes([]); setSettings(defaultInitialSettings); setCalendarEvents([]);
+      } finally {
+        setLoading(false);
       }
+    };
+    loadUserData();
+  }, [currentUser]);
 
-      const storedJobs = localStorage.getItem(jobsKey);
-      const storedClients = localStorage.getItem(clientsKey);
-      const storedDrafts = localStorage.getItem(draftsKey);
-      const storedSettings = localStorage.getItem(settingsKey);
-      const storedCalendarEvents = localStorage.getItem(calendarKey);
-
-      // Onboard new user with default data if they have no stored data
-      const isNewUser = !storedJobs && !storedClients && !storedDrafts && !storedSettings;
-
-      // Load Jobs
-      const parsedJobs = storedJobs ? JSON.parse(storedJobs) : [];
-      const migratedJobs = parsedJobs.map((job: any): Job => ({
-        ...job, id: job.id || uuidv4(), isDeleted: job.isDeleted ?? false, observationsLog: job.observationsLog || [], cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []), createCalendarEvent: job.createCalendarEvent ?? false, cost: job.cost ?? undefined, payments: job.payments || [], calendarEventId: job.calendarEventId, isRecurring: job.isRecurring ?? false,
-      }));
-      setJobs(migratedJobs);
-
-      // Load Clients
-      setClients(isNewUser ? initialClientsForNewUser : (storedClients ? JSON.parse(storedClients) : []));
-      
-      // Load Drafts
-      const parsedDrafts = isNewUser ? initialDraftNotesForNewUser : (storedDrafts ? JSON.parse(storedDrafts) : []);
-      setDraftNotes(parsedDrafts.map((draft: any): DraftNote => ({
-        ...draft, type: draft.type || 'SCRIPT', scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), content: draft.content || '', attachments: draft.attachments || [],
-      })));
-      
-      // Load Settings
-      const loadedSettings = storedSettings ? JSON.parse(storedSettings) : defaultInitialSettings;
-      setSettings({
-        ...defaultInitialSettings,
-        ...loadedSettings,
-        userName: loadedSettings.userName || currentUser.username, // Default to auth username
-      });
-
-      // Load Calendar Events
-      setCalendarEvents(storedCalendarEvents ? JSON.parse(storedCalendarEvents) : []);
-
-    } catch (error) {
-      console.error("Failed to load or migrate data from localStorage for user", currentUser.id, error);
-      setJobs([]); setClients([]); setDraftNotes([]); setSettings(defaultInitialSettings); setCalendarEvents([]);
-    } finally {
-      setLoading(false);
+  // Data saving effects, now user-specific and async
+  const saveData = useCallback(async <T extends unknown>(key: string, data: T) => {
+    if (!loading && currentUser) {
+        await blobService.set(currentUser.id, key, data);
     }
-  }, [currentUser, getUserDataKey]);
+  }, [currentUser, loading]);
 
-  // Data saving effects, now user-specific
-  useEffect(() => { const key = getUserDataKey('jobs'); if (!loading && key) localStorage.setItem(key, JSON.stringify(jobs)); }, [jobs, loading, getUserDataKey]);
-  useEffect(() => { const key = getUserDataKey('clients'); if (!loading && key) localStorage.setItem(key, JSON.stringify(clients)); }, [clients, loading, getUserDataKey]);
-  useEffect(() => { const key = getUserDataKey('draftNotes'); if (!loading && key) localStorage.setItem(key, JSON.stringify(draftNotes)); }, [draftNotes, loading, getUserDataKey]);
-  useEffect(() => { const key = getUserDataKey('settings'); if (!loading && key) localStorage.setItem(key, JSON.stringify(settings)); }, [settings, loading, getUserDataKey]);
-  useEffect(() => { const key = getUserDataKey('calendarEvents'); if (!loading && key) localStorage.setItem(key, JSON.stringify(calendarEvents)); }, [calendarEvents, loading, getUserDataKey]);
+  useEffect(() => { saveData('jobs', jobs); }, [jobs, saveData]);
+  useEffect(() => { saveData('clients', clients); }, [clients, saveData]);
+  useEffect(() => { saveData('draftNotes', draftNotes); }, [draftNotes, saveData]);
+  useEffect(() => { saveData('settings', settings); }, [settings, saveData]);
+  useEffect(() => { saveData('calendarEvents', calendarEvents); }, [calendarEvents, saveData]);
 
 
  const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost' | 'isRecurring'>>) => {
@@ -265,9 +259,75 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     setJobs(prev => prev.map(j => ({ ...j, calendarEventId: undefined })));
   }, [updateSettings]);
 
+  const exportData = useCallback(() => {
+    if (!currentUser) {
+      toast.error("Você precisa estar logado para exportar dados.");
+      return;
+    }
+    const dataToExport = {
+      version: '2.0-blob',
+      exportedAt: new Date().toISOString(),
+      data: {
+        jobs,
+        clients,
+        draftNotes,
+        settings,
+        calendarEvents,
+      }
+    };
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(dataToExport, null, 2)
+    )}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = `big_backup_${currentUser.username}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    toast.success("Dados exportados com sucesso!");
+  }, [jobs, clients, draftNotes, settings, calendarEvents, currentUser]);
+
+  const importData = useCallback(async (jsonData: string): Promise<boolean> => {
+    if (!currentUser) {
+      toast.error("Você precisa estar logado para importar dados.");
+      return false;
+    }
+    try {
+      const parsedData = JSON.parse(jsonData);
+      if (!parsedData.data || !parsedData.data.jobs || !parsedData.data.clients || !parsedData.data.settings) {
+        toast.error("Arquivo de backup inválido ou corrompido.");
+        return false;
+      }
+
+      const {
+        jobs: importedJobs,
+        clients: importedClients,
+        draftNotes: importedDrafts,
+        settings: importedSettings,
+        calendarEvents: importedEvents
+      } = parsedData.data;
+
+      setJobs(importedJobs || []);
+      setClients(importedClients || []);
+      setDraftNotes(importedDrafts || []);
+      setSettings(importedSettings || defaultInitialSettings);
+      setCalendarEvents(importedEvents || []);
+      
+      toast.success("Dados importados com sucesso! A aplicação será recarregada.");
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+
+      return true;
+    } catch (error) {
+      console.error("Error importing data:", error);
+      toast.error("Erro ao processar o arquivo de importação. Verifique se é um JSON válido.");
+      return false;
+    }
+  }, [currentUser]);
+
 
   const contextValue: AppDataContextType = {
-    jobs, clients, draftNotes, settings, calendarEvents, addJob, updateJob, deleteJob, permanentlyDeleteJob, getJobById, addClient, updateClient, deleteClient, getClientById, updateSettings, addDraftNote, updateDraftNote, deleteDraftNote, connectGoogleCalendar, disconnectGoogleCalendar, syncCalendar, loading
+    jobs, clients, draftNotes, settings, calendarEvents, addJob, updateJob, deleteJob, permanentlyDeleteJob, getJobById, addClient, updateClient, deleteClient, getClientById, updateSettings, addDraftNote, updateDraftNote, deleteDraftNote, connectGoogleCalendar, disconnectGoogleCalendar, syncCalendar, exportData, importData, loading
   };
 
   return React.createElement(AppDataContext.Provider, { value: contextValue }, children);

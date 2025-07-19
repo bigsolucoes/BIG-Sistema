@@ -5,7 +5,8 @@ import {
   Home, Briefcase, Users, CreditCard, BarChartBig, MessageCircle, Link2, FolderArchive, 
   Sparkles, Cog, PlusCircle, X, Trash2, Edit3, CheckCircle, AlertCircle, Clock, 
   DollarSign, Eye, EyeOff, List, ArrowRight, Settings, CalendarDays, Archive as ArchiveIconLucide, FileText, Bot,
-  Save, Check, ChevronLeft, ChevronRight, Wallet, ExternalLink, ImageUp, ImageOff, Plus, Minus, Table, ChevronDown, ChevronUp, Paperclip, Bell, RotateCw
+  Save, Check, ChevronLeft, ChevronRight, Wallet, ExternalLink, ImageUp, ImageOff, Plus, Minus, Table, ChevronDown, ChevronUp, Paperclip, Bell, RotateCw,
+  Download, Upload
 } from 'lucide-react';
 
 export const APP_NAME = "BIG";
@@ -51,6 +52,8 @@ export const ImageOffIcon = ImageOff; // For removing image
 export const PaperclipIcon = Paperclip; // For attachments
 export const BellIcon = Bell; // For notifications/updates
 export const SyncIcon = RotateCw; // Newly added for calendar sync
+export const UploadIcon = Upload; // For import
+export const DownloadIcon = Download; // For export
 
 
 // Specific use case icons, might be same as above but named for clarity
