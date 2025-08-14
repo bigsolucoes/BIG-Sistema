@@ -7,7 +7,8 @@ import { APP_NAME } from '../../constants';
 import toast from 'react-hot-toast';
 
 const RegisterPage: React.FC = () => {
-  const [username, setUsername] = useState(''); // Changed from email
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,14 +34,18 @@ const RegisterPage: React.FC = () => {
         toast.error('O nome de usuário deve conter apenas letras, números e underscore (_).');
         return;
     }
+    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+        toast.error('Por favor, insira um email válido.');
+        return;
+    }
     setIsLoading(true);
-    const success = await register(username, password); // Changed from email
+    const success = await register(username, email, password);
     setIsLoading(false);
     if (success) {
       toast.success('Registro bem-sucedido! Bem-vindo(a)!');
       navigate('/dashboard');
     } else {
-      toast.error('Falha no registro. Este nome de usuário pode já estar em uso ou ocorreu um erro.'); // Updated error message
+      toast.error('Falha no registro. Este nome de usuário ou email pode já estar em uso.');
     }
   };
   
@@ -62,14 +67,27 @@ const RegisterPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="bg-card-bg shadow-xl rounded-xl p-6 sm:p-8 space-y-6">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-text-secondary mb-1">Usuário (mín. 3 caracteres, letras, números, _)</label> {/* Changed from Email */}
+            <label htmlFor="username" className="block text-sm font-medium text-text-secondary mb-1">Usuário (mín. 3 caracteres, letras, números, _)</label>
             <input
-              type="text" // Changed from email
+              type="text"
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)} // Changed from setEmail
+              onChange={(e) => setUsername(e.target.value)}
               className={commonInputClass}
-              placeholder="seu_usuario" // Changed placeholder
+              placeholder="seu_usuario"
+              required
+              disabled={isLoading}
+            />
+          </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={commonInputClass}
+              placeholder="seu@email.com"
               required
               disabled={isLoading}
             />

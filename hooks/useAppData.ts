@@ -4,7 +4,7 @@ import { Job, Client, AppSettings, JobObservation, DraftNote, Payment, CalendarE
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
 import { useAuth } from './useAuth';
-import * as blobService from '../services/blobStorageService';
+import { DatabaseService } from '../services/databaseService';
 
 // Default theme colors
 const DEFAULT_PRIMARY_COLOR = '#f8fafc'; // slate-50
@@ -69,6 +69,16 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [settings, setSettings] = useState<AppSettings>(defaultInitialSettings);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [dbService, setDbService] = useState<DatabaseService | null>(null);
+
+  // Initialize database service when user changes
+  useEffect(() => {
+    if (currentUser) {
+      setDbService(new DatabaseService(currentUser.id));
+    } else {
+      setDbService(null);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--color-main-bg', settings.primaryColor || DEFAULT_PRIMARY_COLOR);
@@ -79,7 +89,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Main data loading effect, triggered by user change
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !dbService) {
       setLoading(false);
       setJobs([]);
       setClients([]);
@@ -93,59 +103,88 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setLoading(true);
       try {
         const [storedJobs, storedClients, storedDrafts, storedSettings, storedCalendarEvents] = await Promise.all([
-          blobService.get<Job[]>(currentUser.id, 'jobs'),
-          blobService.get<Client[]>(currentUser.id, 'clients'),
-          blobService.get<DraftNote[]>(currentUser.id, 'draftNotes'),
-          blobService.get<AppSettings>(currentUser.id, 'settings'),
-          blobService.get<CalendarEvent[]>(currentUser.id, 'calendarEvents'),
+          dbService.getJobs(),
+          dbService.getClients(),
+          dbService.getDraftNotes(),
+          dbService.getSettings(),
+          dbService.getCalendarEvents(),
         ]);
 
-        const isNewUser = !storedJobs && !storedClients && !storedDrafts && !storedSettings;
+        const isNewUser = storedJobs.length === 0 && storedClients.length === 0 && storedDrafts.length === 0 && !storedSettings;
 
-        const parsedJobs = storedJobs || [];
-        const migratedJobs = parsedJobs.map((job: any): Job => ({
-          ...job, id: job.id || uuidv4(), isDeleted: job.isDeleted ?? false, observationsLog: job.observationsLog || [], cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []), createCalendarEvent: job.createCalendarEvent ?? false, cost: job.cost ?? undefined, payments: job.payments || [], calendarEventId: job.calendarEventId, isRecurring: job.isRecurring ?? false,
+        // Migrate and set jobs
+        const migratedJobs = storedJobs.map((job: any): Job => ({
+          ...job, 
+          id: job.id || uuidv4(), 
+          isDeleted: job.isDeleted ?? false, 
+          observationsLog: job.observationsLog || [], 
+          cloudLinks: job.cloudLinks || (job.cloudLink ? [job.cloudLink] : []), 
+          createCalendarEvent: job.createCalendarEvent ?? false, 
+          cost: job.cost ?? undefined, 
+          payments: job.payments || [], 
+          calendarEventId: job.calendarEventId, 
+          isRecurring: job.isRecurring ?? false,
         }));
         setJobs(migratedJobs);
 
-        setClients(isNewUser ? initialClientsForNewUser : (storedClients || []));
+        // Set clients (with initial data for new users)
+        if (isNewUser && storedClients.length === 0) {
+          // Create initial clients for new users
+          for (const client of initialClientsForNewUser) {
+            await dbService.createClient(client);
+          }
+          setClients(initialClientsForNewUser);
+        } else {
+          setClients(storedClients);
+        }
         
-        const parsedDrafts = isNewUser ? initialDraftNotesForNewUser : (storedDrafts || []);
-        setDraftNotes(parsedDrafts.map((draft: any): DraftNote => ({
-          ...draft, type: draft.type || 'SCRIPT', scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), content: draft.content || '', attachments: draft.attachments || [],
-        })));
+        // Set draft notes (with initial data for new users)
+        if (isNewUser && storedDrafts.length === 0) {
+          // Create initial draft notes for new users
+          for (const draft of initialDraftNotesForNewUser) {
+            await dbService.createDraftNote(draft);
+          }
+          setDraftNotes(initialDraftNotesForNewUser);
+        } else {
+          const parsedDrafts = storedDrafts.map((draft: any): DraftNote => ({
+            ...draft, 
+            type: draft.type || 'SCRIPT', 
+            scriptLines: draft.scriptLines || (draft.content ? [{id: uuidv4(), scene: "1", description: draft.content, duration: 0}] : []), 
+            content: draft.content || '', 
+            attachments: draft.attachments || [],
+          }));
+          setDraftNotes(parsedDrafts);
+        }
         
+        // Set settings
         const loadedSettings = storedSettings || defaultInitialSettings;
-        setSettings({
+        const finalSettings = {
           ...defaultInitialSettings,
           ...loadedSettings,
-          userName: loadedSettings.userName || currentUser.username,
-        });
+          userName: loadedSettings?.userName || currentUser.username,
+        };
+        setSettings(finalSettings);
 
-        setCalendarEvents(storedCalendarEvents || []);
+        // Update settings in database if they don't exist
+        if (!storedSettings) {
+          await dbService.updateSettings(finalSettings);
+        }
+
+        setCalendarEvents(storedCalendarEvents);
 
       } catch (error) {
-        console.error("Failed to load or migrate data from blob storage for user", currentUser.id, error);
-        setJobs([]); setClients([]); setDraftNotes([]); setSettings(defaultInitialSettings); setCalendarEvents([]);
+        console.error("Failed to load data from database for user", currentUser.id, error);
+        setJobs([]); 
+        setClients([]); 
+        setDraftNotes([]); 
+        setSettings(defaultInitialSettings); 
+        setCalendarEvents([]);
       } finally {
         setLoading(false);
       }
     };
     loadUserData();
-  }, [currentUser]);
-
-  // Data saving effects, now user-specific and async
-  const saveData = useCallback(async <T extends unknown>(key: string, data: T) => {
-    if (!loading && currentUser) {
-        await blobService.set(currentUser.id, key, data);
-    }
-  }, [currentUser, loading]);
-
-  useEffect(() => { saveData('jobs', jobs); }, [jobs, saveData]);
-  useEffect(() => { saveData('clients', clients); }, [clients, saveData]);
-  useEffect(() => { saveData('draftNotes', draftNotes); }, [draftNotes, saveData]);
-  useEffect(() => { saveData('settings', settings); }, [settings, saveData]);
-  useEffect(() => { saveData('calendarEvents', calendarEvents); }, [calendarEvents, saveData]);
+  }, [currentUser, dbService]);
 
 
  const addJob = useCallback((jobData: Omit<Job, 'id' | 'createdAt' | 'isDeleted' | 'observationsLog' | 'payments' | 'cloudLinks' | 'createCalendarEvent' | 'calendarEventId'> & Partial<Pick<Job, 'cloudLinks' | 'createCalendarEvent' | 'cost' | 'isRecurring'>>) => {

@@ -4,7 +4,7 @@ import { useAppData } from '../hooks/useAppData';
 import { AIChatMessage as AIChatMessageType, GroundingChunk } from '../types';
 import AIChatMessageComponent from '../components/AIChatMessage';
 import { SparklesIcon } from '../constants';
-import { callGeminiApi } from '../services/geminiService';
+import { callFreeAI } from '../services/freeAIService';
 import { v4 as uuidv4 } from 'uuid';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { SendHorizonal } from 'lucide-react'; // Using SendHorizonal for send button
@@ -56,7 +56,7 @@ const AIAssistantPage: React.FC = () => {
         calendarEvents,
       };
       
-      const aiResponse = await callGeminiApi(input, contextData);
+      const aiResponse = await callFreeAI(input, contextData);
       
       let responseText = aiResponse.text;
       const groundingMetadata = aiResponse.candidates?.[0]?.groundingMetadata;
