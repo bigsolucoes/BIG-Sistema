@@ -51,10 +51,29 @@ interface AppDataContextType {
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
 const initialClientsForNewUser: Client[] = [
-    { id: 'client1', name: 'Ana Silva', company: 'TechCorp Solutions', email: 'ana.silva@techcorp.com', phone: '11987654321', createdAt: new Date().toISOString(), cpf: '111.222.333-44', observations: 'Prefere comunicação por email.' },
+    { 
+      id: uuidv4(), // <--- Aqui estava o problema (antes era 'client1')
+      name: 'Ana Silva', 
+      company: 'TechCorp Solutions', 
+      email: 'ana.silva@techcorp.com', 
+      phone: '11987654321', 
+      createdAt: new Date().toISOString(), 
+      cpf: '111.222.333-44', 
+      observations: 'Prefere comunicação por email.' 
+    },
 ];
+
 const initialDraftNotesForNewUser: DraftNote[] = [
-    {id: uuidv4(), title: "Exemplo de Roteiro", type: 'SCRIPT', content: "", scriptLines: [{id: uuidv4(), scene: "1", description: "CENA DE ABERTURA: Um dia ensolarado no parque.", duration: 15}], attachments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()},
+    {
+      id: uuidv4(), 
+      title: "Exemplo de Roteiro", 
+      type: 'SCRIPT', 
+      content: "", 
+      scriptLines: [{id: uuidv4(), scene: "1", description: "CENA DE ABERTURA: Um dia ensolarado no parque.", duration: 15}], 
+      attachments: [], 
+      createdAt: new Date().toISOString(), 
+      updatedAt: new Date().toISOString()
+    },
 ];
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
